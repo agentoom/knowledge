@@ -4,6 +4,8 @@ Agentoom Knowledge is a self-hosted Knowledge Server that exposes trusted enterp
 
 > **Knowledge is heterogeneous. Retrieval should be too.**
 
+📖 **[Read the full article →](ARTICLE.md)**
+
 ---
 
 ## The Problem
@@ -276,11 +278,24 @@ vendor/bin/sail artisan serve
 
 The application will be available at `http://localhost:8000`.
 
+### Testing
+
+A `.env.testing` file is provided with CI-friendly defaults (SQLite in-memory database, array cache and session drivers, sync queue). To run tests without Docker services:
+
+```bash
+cp .env.testing .env
+vendor/bin/sail artisan test --compact
+```
+
+Note: some tests that exercise the vector store (Typesense) or Horizon will need Docker services running.
+
 ### Default Admin User
 
 After seeding, log in with:
 - **Email:** `admin@agentoom.com`
 - **Password:** `changeme`
+
+The seeder is idempotent — you can safely re-run `migrate --seed` without duplicate key errors.
 
 ### Queue Worker
 
