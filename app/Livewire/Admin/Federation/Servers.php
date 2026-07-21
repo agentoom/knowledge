@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Federation;
 
 use App\Federation\FederationManager;
 use App\Models\FederatedServer;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class Servers extends Component
@@ -122,7 +123,7 @@ class Servers extends Component
         session()->flash('status', 'Capabilities synced from remote server.');
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.admin.federation.servers', [
             'servers' => FederatedServer::orderBy('priority', 'desc')->get(),

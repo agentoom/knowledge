@@ -36,6 +36,7 @@ class McpApiGuard implements Guard
             })
             ->get();
 
+        /** @var ApiKey|null $apiKey */
         $apiKey = $candidates->first(fn (ApiKey $key) => Hash::check($token, $key->key));
 
         if ($apiKey === null) {
@@ -44,7 +45,10 @@ class McpApiGuard implements Guard
 
         $apiKey->update(['last_used_at' => now()]);
 
-        return $this->user = $apiKey->user ?? $this->createServiceAccountUser($apiKey);
+        /** @var Authenticatable|null $authenticatedUser */
+        $authenticatedUser = $apiKey->user ?? $this->createServiceAccountUser($apiKey);
+
+        return $this->user = $authenticatedUser;
     }
 
     private function createServiceAccountUser(ApiKey $apiKey): Authenticatable
@@ -87,6 +91,9 @@ class McpApiGuard implements Guard
         };
     }
 
+    /**
+     * @param  array<string, mixed>  $credentials
+     */
     public function validate(array $credentials = []): bool
     {
         return false;
@@ -115,6 +122,7 @@ class McpApiGuard implements Guard
             return false;
         }
 
+        /** @var array<int, string> $scopes */
         $scopes = $apiKey->scopes ?? [];
 
         if (in_array('admin:*', $scopes, true)) {

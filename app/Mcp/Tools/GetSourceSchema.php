@@ -46,7 +46,7 @@ class GetSourceSchema extends Tool
 
         $namespace = $provider['namespace'];
 
-        return Response::text(json_encode([
+        return Response::text((string) json_encode([
             'source' => $provider,
             'schema' => $schemas[$namespace] ?? null,
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));

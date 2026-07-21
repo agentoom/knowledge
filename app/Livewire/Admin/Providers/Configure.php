@@ -3,6 +3,8 @@
 namespace App\Livewire\Admin\Providers;
 
 use App\Knowledge\Models\Provider;
+use Carbon\CarbonInterface;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class Configure extends Component
@@ -34,9 +36,11 @@ class Configure extends Component
         $this->class = $provider->class;
         $this->type = $provider->type;
         $this->status = $provider->status;
-        $this->metadata = json_encode($provider->metadata, JSON_PRETTY_PRINT);
+        $this->metadata = (string) json_encode($provider->metadata, JSON_PRETTY_PRINT);
         $this->sourceName = $provider->knowledgeSource?->name;
-        $this->lastSyncedAt = $provider->last_synced_at?->toDateTimeString();
+        $this->lastSyncedAt = $provider->last_synced_at instanceof CarbonInterface
+            ? $provider->last_synced_at->toDateTimeString()
+            : null;
         $this->errorMessage = $provider->error_message;
     }
 
@@ -61,7 +65,7 @@ class Configure extends Component
         session()->flash('status', 'Provider configuration saved successfully.');
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.admin.providers.configure')
             ->layout('layouts.app', ['header' => 'Configure Provider']);

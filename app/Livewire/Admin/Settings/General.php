@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Settings;
 
 use App\Settings\Facades\Settings;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class General extends Component
@@ -21,8 +22,14 @@ class General extends Component
 
     public int $chunkOverlap = 200;
 
+    /**
+     * @var array<string, string>
+     */
     public array $availablePlannerStrategies = [];
 
+    /**
+     * @var array<string, string>
+     */
     public array $availableChunkingStrategies = [];
 
     public function mount(): void
@@ -68,7 +75,7 @@ class General extends Component
         $this->dispatch('notify', message: 'General settings saved successfully.');
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.admin.settings.general');
     }

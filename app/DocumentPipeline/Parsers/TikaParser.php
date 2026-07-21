@@ -16,9 +16,15 @@ class TikaParser implements DocumentParser
 
     public function parse(string $filePath): array
     {
+        $contents = file_get_contents($filePath);
+
+        if ($contents === false) {
+            throw new \RuntimeException("Unable to read file: {$filePath}");
+        }
+
         $response = Http::attach(
             'file',
-            file_get_contents($filePath),
+            $contents,
             basename($filePath)
         )->put("{$this->endpoint}/tika", [
             'Accept' => 'application/json',

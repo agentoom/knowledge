@@ -5,6 +5,7 @@ namespace App\Livewire\Admin\Users;
 use App\Enums\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -65,7 +66,9 @@ class Index extends Component
         $this->editingId = $user->id;
         $this->editName = $user->name;
         $this->editEmail = $user->email;
-        $this->editRole = $user->role?->value ?? 'viewer';
+        /** @var Role|null $role */
+        $role = $user->role;
+        $this->editRole = $role?->value ?? 'viewer';
         $this->showEditModal = true;
     }
 
@@ -118,7 +121,7 @@ class Index extends Component
         session()->flash('status', "Role updated for {$user->name}.");
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.admin.users.index', [
             'users' => User::orderBy('name')->paginate(15),

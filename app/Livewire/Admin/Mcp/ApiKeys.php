@@ -5,6 +5,7 @@ namespace App\Livewire\Admin\Mcp;
 use App\Models\ApiKey;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class ApiKeys extends Component
@@ -13,6 +14,9 @@ class ApiKeys extends Component
 
     public string $name = '';
 
+    /**
+     * @var array<int, string>
+     */
     public array $scopes = ['knowledge:read'];
 
     public ?string $expiresAt = null;
@@ -48,7 +52,7 @@ class ApiKeys extends Component
         session()->flash('status', 'API key revoked.');
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.admin.mcp.api-keys', [
             'keys' => ApiKey::with('user')->latest()->get(),

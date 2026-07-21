@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\KnowledgeSources;
 
 use App\DocumentPipeline\Services\PipelineOrchestrator;
 use App\Knowledge\Models\KnowledgeSource;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class Show extends Component
@@ -30,8 +31,14 @@ class Show extends Component
 
     public int $activeDocumentCount = 0;
 
+    /**
+     * @var array<int, array<string, mixed>>
+     */
     public array $documents = [];
 
+    /**
+     * @var array<string, mixed>
+     */
     public array $providerConfig = [];
 
     public bool $isEditingConfig = false;
@@ -78,7 +85,7 @@ class Show extends Component
         $this->priority = $source->priority;
         $this->createdAt = $source->created_at?->toDateTimeString();
         $this->providerConfig = $source->provider_config ?? [];
-        $this->configJson = json_encode($this->providerConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $this->configJson = (string) json_encode($this->providerConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
         $this->loadConfigIntoFormFields($source);
 
@@ -174,12 +181,15 @@ class Show extends Component
         $source->update(['provider_config' => $config]);
 
         $this->providerConfig = $source->provider_config;
-        $this->configJson = json_encode($this->providerConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $this->configJson = (string) json_encode($this->providerConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         $this->isEditingConfig = false;
 
         session()->flash('status', 'Configuration updated successfully.');
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function sqlFormRules(): array
     {
         if ($this->configUseDynamicConnection) {
@@ -200,6 +210,9 @@ class Show extends Component
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function buildSqlFormConfig(): array
     {
         $config = ['table' => $this->configTable];
@@ -229,7 +242,7 @@ class Show extends Component
         session()->flash('status', 'Discovery and indexing pipeline started.');
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.admin.knowledge-sources.show')
             ->layout('layouts.app', ['header' => 'Knowledge Source Detail']);

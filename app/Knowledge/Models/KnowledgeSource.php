@@ -9,9 +9,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property array<string, mixed>|null $provider_config
+ *
+ * @use HasFactory<KnowledgeSourceFactory>
  */
 class KnowledgeSource extends Model
 {
+    /** @use HasFactory<KnowledgeSourceFactory> */
     use HasFactory;
 
     protected static function newFactory(): KnowledgeSourceFactory

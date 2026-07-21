@@ -5,10 +5,14 @@ namespace App\Livewire\Admin\Health;
 use App\VectorStore\Services\VectorStoreManager;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class Dashboard extends Component
 {
+    /**
+     * @var array<string, array<string, mixed>>
+     */
     public array $checks = [];
 
     public function mount(VectorStoreManager $vectorStoreManager): void
@@ -21,6 +25,9 @@ class Dashboard extends Component
         ];
     }
 
+    /**
+     * @return array{status: string, message: string}
+     */
     private function checkDatabase(): array
     {
         try {
@@ -32,6 +39,9 @@ class Dashboard extends Component
         }
     }
 
+    /**
+     * @return array{status: string, message: string}
+     */
     private function checkCache(): array
     {
         try {
@@ -43,6 +53,9 @@ class Dashboard extends Component
         }
     }
 
+    /**
+     * @return array{status: string, message: string}
+     */
     private function checkVectorStore(VectorStoreManager $manager): array
     {
         try {
@@ -54,7 +67,7 @@ class Dashboard extends Component
         }
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.admin.health.dashboard')
             ->layout('layouts.app', ['header' => 'Health']);

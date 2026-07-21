@@ -3,14 +3,24 @@
 namespace App\Livewire\Admin\Mcp;
 
 use App\Mcp\Servers\KnowledgeServer;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class Settings extends Component
 {
+    /**
+     * @var array<string, mixed>
+     */
     public array $serverInfo = [];
 
+    /**
+     * @var array<int, array<string, string>>
+     */
     public array $tools = [];
 
+    /**
+     * @var array<int, array<string, string>>
+     */
     public array $prompts = [];
 
     public function mount(): void
@@ -22,23 +32,33 @@ class Settings extends Component
         foreach ($attrs as $attr) {
             $instance = $attr->newInstance();
             $name = class_basename($attr->getName());
-            $this->serverInfo[$name] = $instance->getArguments()[0] ?? $name;
+            $args = $instance->getArguments();
+            $this->serverInfo[$name] = $args[0] ?? $name;
         }
 
         $server = app(KnowledgeServer::class);
+        $serverReflection = new \ReflectionClass($server);
 
-        $this->tools = collect($server->tools())->map(fn ($tool) => [
-            'name' => $tool->name(),
-            'description' => $tool->description(),
+        $toolsProp = $serverReflection->getProperty('tools');
+        /** @var array<int, object> $toolClasses */
+        $toolClasses = $toolsProp->getValue($server);
+
+        $this->tools = collect($toolClasses)->map(fn ($toolClass) => [
+            'name' => $toolClass->name(),
+            'description' => $toolClass->description(),
         ])->all();
 
-        $this->prompts = collect($server->prompts())->map(fn ($prompt) => [
-            'name' => $prompt->name(),
-            'description' => $prompt->description(),
+        $promptsProp = $serverReflection->getProperty('prompts');
+        /** @var array<int, object> $promptClasses */
+        $promptClasses = $promptsProp->getValue($server);
+
+        $this->prompts = collect($promptClasses)->map(fn ($promptClass) => [
+            'name' => $promptClass->name(),
+            'description' => $promptClass->description(),
         ])->all();
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.admin.mcp.settings')
             ->layout('layouts.app', ['header' => 'MCP Settings']);

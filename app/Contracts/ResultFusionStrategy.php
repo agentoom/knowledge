@@ -8,7 +8,7 @@ interface ResultFusionStrategy
 {
     /**
      * @param  array<int, SearchResult>  $results
-     * @return array<int, SearchResult>
+     * @return array<int, array<string, mixed>>
      */
     public function fuse(array $results): array;
 

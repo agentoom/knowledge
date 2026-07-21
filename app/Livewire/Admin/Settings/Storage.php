@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Settings;
 
 use App\Settings\Facades\Settings;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class Storage extends Component
@@ -34,7 +35,7 @@ class Storage extends Component
         $this->dispatch('notify', message: 'Storage settings saved successfully.');
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.admin.settings.storage');
     }

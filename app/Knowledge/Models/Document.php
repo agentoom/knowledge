@@ -39,11 +39,17 @@ class Document extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<KnowledgeSource, $this>
+     */
     public function knowledgeSource(): BelongsTo
     {
         return $this->belongsTo(KnowledgeSource::class);
     }
 
+    /**
+     * @return HasMany<Chunk, $this>
+     */
     public function chunks(): HasMany
     {
         return $this->hasMany(Chunk::class);

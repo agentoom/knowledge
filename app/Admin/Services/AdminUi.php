@@ -6,15 +6,15 @@ use Illuminate\Support\Collection;
 
 class AdminUi
 {
-    /** @var Collection<int, array{route: string, label: string, icon: string, group: string, permission: string|null}> */
-    private Collection $pages;
+    /** @var array<int, array{route: string, label: string, icon: string, group: string, permission: string|null}> */
+    private array $pages;
 
     /** @var Collection<int, array{key: string, type: string, group: string, label: string}> */
     private Collection $registeredSettings;
 
     public function __construct()
     {
-        $this->pages = collect();
+        $this->pages = [];
         $this->registeredSettings = collect();
     }
 
@@ -25,13 +25,13 @@ class AdminUi
         string $group = 'Plugins',
         ?string $permission = null,
     ): void {
-        $this->pages->push([
+        $this->pages[] = [
             'route' => $route,
             'label' => $label,
             'icon' => $icon,
             'group' => $group,
             'permission' => $permission,
-        ]);
+        ];
     }
 
     /**
@@ -54,7 +54,10 @@ class AdminUi
      */
     public function getSidebarGroups(): array
     {
-        return $this->pages
+        /** @var Collection<int, array{route: string, label: string, icon: string, group: string, permission: string|null}> $collection */
+        $collection = collect($this->pages);
+
+        return $collection
             ->pluck('group')
             ->unique()
             ->values()
@@ -62,19 +65,20 @@ class AdminUi
     }
 
     /**
-     * @return Collection<int, array{route: string, label: string, icon: string, group: string, permission: string|null}>
+     * @phpstan-return Collection<int, array{route: string, label: string, icon: string, group: string, permission: string|null}>
      */
     public function getPages(): Collection
     {
-        return $this->pages;
+        return collect($this->pages);
     }
 
     /**
-     * @return Collection<int, array{route: string, label: string, icon: string, group: string, permission: string|null}>
+     * @phpstan-return Collection<int, array{route: string, label: string, icon: string, group: string, permission: string|null}>
      */
     public function getPagesByGroup(string $group): Collection
     {
-        return $this->pages->where('group', $group);
+        /** @var Collection<int, array{route: string, label: string, icon: string, group: string, permission: string|null}> $collection */
+        return collect($this->pages)->where('group', $group);
     }
 
     /**

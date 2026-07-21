@@ -3,10 +3,14 @@
 namespace App\Livewire\Admin\Jobs;
 
 use Illuminate\Support\Facades\Redis;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class Index extends Component
 {
+    /**
+     * @var array<string, array{pending: int, processed: int}>
+     */
     public array $queueStats = [];
 
     public int $recentJobs = 0;
@@ -45,6 +49,9 @@ class Index extends Component
         }
     }
 
+    /**
+     * @return array<string, array{pending: int, processed: int}>
+     */
     protected function getQueueWorkload(string $prefix): array
     {
         $redis = Redis::connection();
@@ -52,9 +59,11 @@ class Index extends Component
         $stats = [];
 
         foreach ($queues as $queue) {
-            $pending = $redis->llen($prefix.'queue:'.$queue.':pending') ?: 0;
+            $pendingRaw = $redis->llen($prefix.'queue:'.$queue.':pending');
+            $pending = is_int($pendingRaw) ? $pendingRaw : 0;
 
-            $processed = $redis->get($prefix.'queue:'.$queue.':processed') ?: 0;
+            $processedRaw = $redis->get($prefix.'queue:'.$queue.':processed');
+            $processed = is_int($processedRaw) ? $processedRaw : 0;
 
             $stats[$queue] = [
                 'pending' => (int) $pending,
@@ -65,7 +74,7 @@ class Index extends Component
         return $stats;
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.admin.jobs.index', [
             'horizonUrl' => url(config('horizon.path', 'horizon')),

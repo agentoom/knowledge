@@ -22,6 +22,7 @@ class CrawlWebSource implements ShouldQueue
 
     public function __construct(
         public readonly int $knowledgeSourceId,
+        /** @var array<int, string> */
         public readonly array $urls,
         public readonly int $depth = 0,
         int $pagesProcessed = 0,
@@ -107,7 +108,7 @@ class CrawlWebSource implements ShouldQueue
             $source->documents()->updateOrCreate(
                 ['path' => $url],
                 [
-                    'filename' => basename(parse_url($url, PHP_URL_PATH)) ?: $url,
+                    'filename' => basename(parse_url($url, PHP_URL_PATH) ?: '') ?: $url,
                     'mime_type' => 'text/html',
                     'size_bytes' => strlen($markdown),
                     'content' => trim($markdown),

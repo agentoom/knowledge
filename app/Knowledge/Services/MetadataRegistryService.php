@@ -17,7 +17,8 @@ class MetadataRegistryService
     {
         $payload = $this->aggregateProviderMetadata();
 
-        $checksum = md5(json_encode($payload));
+        $jsonPayload = json_encode($payload);
+        $checksum = md5($jsonPayload !== false ? $jsonPayload : '');
 
         $registry = MetadataRegistry::create([
             'payload' => $payload,
@@ -40,6 +41,9 @@ class MetadataRegistryService
         return $registry;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function get(): array
     {
         $latest = MetadataRegistry::latest('id')->first();
@@ -87,7 +91,7 @@ class MetadataRegistryService
 
             $providerMetadata[] = [
                 'class' => $provider->class,
-                'priority' => $provider->knowledgeSource?->priority ?? 0,
+                'priority' => $provider->knowledgeSource->priority ?? 0,
                 'namespace' => $meta['namespace'] ?? null,
                 'capabilities' => $meta['capabilities'] ?? [],
                 'resources' => $meta['searchableResources'] ?? [],

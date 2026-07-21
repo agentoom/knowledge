@@ -79,6 +79,9 @@ class KnowledgeSourceObserver
         ];
     }
 
+    /**
+     * @return array<int, string>
+     */
     private function resolveCapabilities(string $type): array
     {
         return match ($type) {

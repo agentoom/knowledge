@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\KnowledgeSources;
 
 use App\Knowledge\Models\KnowledgeSource;
+use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -184,6 +185,9 @@ class Index extends Component
         session()->flash('status', 'Knowledge source status updated.');
     }
 
+    /**
+     * @return array<string, array<string, string>|string>
+     */
     private function configRules(): array
     {
         return match ($this->providerType) {
@@ -194,6 +198,9 @@ class Index extends Component
         };
     }
 
+    /**
+     * @return array<string, array<string, string>|string>
+     */
     private function editConfigRules(): array
     {
         return match ($this->editProviderType) {
@@ -204,6 +211,9 @@ class Index extends Component
         };
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function sqlConfigRules(): array
     {
         if ($this->configUseDynamicConnection) {
@@ -224,6 +234,9 @@ class Index extends Component
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function editSqlConfigRules(): array
     {
         if ($this->editConfigUseDynamicConnection) {
@@ -244,26 +257,41 @@ class Index extends Component
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function pathConfigRules(): array
     {
         return ['configBasePath' => 'required|string|max:512'];
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function editPathConfigRules(): array
     {
         return ['editConfigBasePath' => 'required|string|max:512'];
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function webConfigRules(): array
     {
         return ['configUrls' => 'required|string'];
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function editWebConfigRules(): array
     {
         return ['editConfigUrls' => 'required|string'];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function buildProviderConfig(): array
     {
         return match ($this->providerType) {
@@ -274,6 +302,9 @@ class Index extends Component
         };
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function buildEditProviderConfig(): array
     {
         return match ($this->editProviderType) {
@@ -284,6 +315,9 @@ class Index extends Component
         };
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function buildSqlConfig(): array
     {
         $config = ['table' => $this->configTable];
@@ -304,6 +338,9 @@ class Index extends Component
         return $config;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function buildEditSqlConfig(): array
     {
         $config = ['table' => $this->editConfigTable];
@@ -324,7 +361,7 @@ class Index extends Component
         return $config;
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.admin.knowledge-sources.index', [
             'sources' => KnowledgeSource::orderBy('name')->paginate(15),

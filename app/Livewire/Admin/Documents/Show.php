@@ -3,6 +3,8 @@
 namespace App\Livewire\Admin\Documents;
 
 use App\Knowledge\Models\Document;
+use Carbon\CarbonInterface;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class Show extends Component
@@ -31,6 +33,9 @@ class Show extends Component
 
     public ?string $sourceName = null;
 
+    /**
+     * @var array<int, array{id: int, content_preview: string, sequence: int, token_count: int, created_at: string|null}>
+     */
     public array $chunks = [];
 
     public function mount(int $document): void
@@ -44,10 +49,18 @@ class Show extends Component
         $this->path = $document->path;
         $this->content = $document->content;
         $this->errorMessage = $document->error_message;
-        $this->parsedAt = $document->parsed_at?->toDateTimeString();
-        $this->chunkedAt = $document->chunked_at?->toDateTimeString();
-        $this->indexedAt = $document->indexed_at?->toDateTimeString();
-        $this->createdAt = $document->created_at?->toDateTimeString();
+        /** @var CarbonInterface $parsedAt */
+        $parsedAt = $document->parsed_at;
+        /** @var CarbonInterface $chunkedAt */
+        $chunkedAt = $document->chunked_at;
+        /** @var CarbonInterface $indexedAt */
+        $indexedAt = $document->indexed_at;
+        /** @var CarbonInterface $createdAt */
+        $createdAt = $document->created_at;
+        $this->parsedAt = $parsedAt->toDateTimeString();
+        $this->chunkedAt = $chunkedAt->toDateTimeString();
+        $this->indexedAt = $indexedAt->toDateTimeString();
+        $this->createdAt = $createdAt->toDateTimeString();
         $this->sourceName = $document->knowledgeSource?->name;
         $this->chunks = $document->chunks->map(fn ($chunk) => [
             'id' => $chunk->id,
@@ -58,7 +71,7 @@ class Show extends Component
         ])->all();
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.admin.documents.show')
             ->layout('layouts.app', ['header' => 'Document Detail']);

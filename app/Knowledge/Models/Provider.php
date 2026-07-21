@@ -34,6 +34,9 @@ class Provider extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<KnowledgeSource, $this>
+     */
     public function knowledgeSource(): BelongsTo
     {
         return $this->belongsTo(KnowledgeSource::class);

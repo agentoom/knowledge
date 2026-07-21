@@ -21,7 +21,7 @@ class ListSources extends Tool
         $namespace = $request->get('namespace');
 
         if (empty($registry)) {
-            return Response::text(json_encode([
+            return Response::text((string) json_encode([
                 'sources' => [],
                 'message' => 'No knowledge sources configured. Use the administration UI to add sources.',
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
@@ -35,7 +35,7 @@ class ListSources extends Tool
             }));
         }
 
-        return Response::text(json_encode([
+        return Response::text((string) json_encode([
             'sources' => $providers,
             'namespaces' => $registry['namespaces'] ?? [],
             'total_sources' => count($providers),

@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 class ApiKeyService
 {
     /**
-     * @param  array<string>  $scopes
+     * @param  array<int, string>  $scopes
      */
     public function create(string $name, int $userId, array $scopes = [], \DateTimeInterface|string|null $expiresAt = null): ApiKey
     {
@@ -39,10 +39,14 @@ class ApiKeyService
     public function rotate(ApiKey $apiKey): ApiKey
     {
         return DB::transaction(function () use ($apiKey) {
+            /** @var string|array<int, string>|null $storedScopes */
+            $storedScopes = $apiKey->scopes;
+            $scopes = is_array($storedScopes) ? $storedScopes : [];
+
             $newKey = $this->create(
                 name: $apiKey->name,
                 userId: $apiKey->user_id,
-                scopes: $apiKey->scopes ?? [],
+                scopes: $scopes,
                 expiresAt: $apiKey->expires_at,
             );
 

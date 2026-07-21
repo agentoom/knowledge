@@ -19,11 +19,13 @@ class DatabaseSeeder extends Seeder
             KnowledgeDemoSeeder::class,
         ]);
 
-        User::factory()->create([
-            'name' => 'Admin',
-            'email' => 'admin@agentoom.com',
-            'password' => 'changeme',
-            'role' => 'admin',
-        ]);
+        User::firstOrCreate(
+            ['email' => 'admin@agentoom.com'],
+            [
+                'name' => 'Admin',
+                'password' => 'changeme',
+                'role' => 'admin',
+            ]
+        );
     }
 }

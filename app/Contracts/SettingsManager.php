@@ -10,6 +10,9 @@ interface SettingsManager
 
     public function forget(string $key): void;
 
+    /**
+     * @return array<string, mixed>
+     */
     public function all(string $group): array;
 
     public function isUsingFallback(): bool;

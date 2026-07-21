@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Documents;
 
 use App\Knowledge\Models\Document;
+use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -10,7 +11,7 @@ class Index extends Component
 {
     use WithPagination;
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.admin.documents.index', [
             'documents' => Document::with('knowledgeSource')

@@ -5,10 +5,15 @@ namespace App\Livewire\Admin\Providers;
 use App\Events\ProviderSynced;
 use App\Knowledge\Models\Provider;
 use App\Knowledge\Services\ProviderManager;
+use Carbon\CarbonInterface;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class Index extends Component
 {
+    /**
+     * @var array<int, array<string, mixed>>
+     */
     public array $providers = [];
 
     public function mount(ProviderManager $providerManager): void
@@ -27,7 +32,9 @@ class Index extends Component
                 'name' => $provider->name,
                 'type' => $provider->type,
                 'status' => $provider->status,
-                'last_synced_at' => $provider->last_synced_at?->diffForHumans(),
+                'last_synced_at' => $provider->last_synced_at instanceof CarbonInterface
+                    ? $provider->last_synced_at->diffForHumans()
+                    : null,
                 'error_message' => $provider->error_message,
                 'capabilities' => $provider->metadata['capabilities'] ?? [],
                 'namespace' => $provider->metadata['namespace'] ?? null,
@@ -73,7 +80,7 @@ class Index extends Component
         session()->flash('status', 'All providers synced successfully.');
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.admin.providers.index')
             ->layout('layouts.app', ['header' => 'Providers']);

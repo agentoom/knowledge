@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\RetrievalLogs;
 
 use App\Models\RetrievalLog;
+use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -20,7 +21,7 @@ class Index extends Component
         $this->showDetailModal = true;
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.admin.retrieval-logs.index', [
             'logs' => RetrievalLog::latest()->paginate(20),

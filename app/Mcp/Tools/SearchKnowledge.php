@@ -37,7 +37,7 @@ class SearchKnowledge extends Tool
         $engine = app(RetrievalEngine::class);
         $result = $engine->execute($plan);
 
-        return Response::text(json_encode([
+        return Response::text((string) json_encode([
             'items' => $result->items,
             'total_count' => $result->totalCount,
             'providers_queried' => collect($plan->steps)->pluck('providerClass')->unique()->values()->all(),
