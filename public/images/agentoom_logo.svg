@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+    <defs>
+        <linearGradient id="agentoom_logo_gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#00fbff"/>
+            <stop offset="100%" stop-color="#bc13fe"/>
+        </linearGradient>
+    </defs>
+    <path d="M16 5L26 25H21L16 15L11 25H6L16 5Z" fill="url(#agentoom_logo_gradient)"></path>
+</svg>
