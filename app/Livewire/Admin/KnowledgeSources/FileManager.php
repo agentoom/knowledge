@@ -9,11 +9,13 @@ use App\Jobs\DocumentPipeline\SyncKnowledgeSource;
 use App\Knowledge\Enums\ProviderType;
 use App\Knowledge\Models\Document;
 use App\Knowledge\Models\KnowledgeSource;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Livewire\WithPagination;
 
 /**
  * File manager scoped to a knowledge source's directory.
@@ -25,6 +27,7 @@ class FileManager extends Component
 {
     use StoresKnowledgeFiles;
     use WithFileUploads;
+    use WithPagination;
 
     public int $sourceId;
 
@@ -55,10 +58,14 @@ class FileManager extends Component
     /** @var array<int, array{path: string, filename: string, size: int, is_document: bool, document_id: int|null, document_status: string|null}> */
     public array $files = [];
 
+    private ?LengthAwarePaginator $paginatorInstance = null;
+
     /** @var array<string, string> */
     public array $sort = ['field' => 'filename', 'direction' => 'asc'];
 
     public string $filter = 'all';
+
+    public string $search = '';
 
     protected function rules(): array
     {
@@ -136,7 +143,7 @@ class FileManager extends Component
 
     public function refreshFiles(): void
     {
-        $source = KnowledgeSource::with('documents')->find($this->sourceId);
+        $source = KnowledgeSource::find($this->sourceId);
 
         if (! $source) {
             $this->files = [];
@@ -146,47 +153,35 @@ class FileManager extends Component
 
         $this->directoryExists = is_dir($this->directoryPath);
 
-        // Bump any chunked-but-fully-indexed documents to 'indexed' status.
-        $source->documents()
-            ->where('status', 'chunked')
-            ->whereDoesntHave('chunks', fn ($q) => $q->whereNull('indexed_at'))
-            ->whereHas('chunks')
-            ->update(['status' => 'indexed', 'indexed_at' => now()]);
+        $query = $source->documents()
+            ->where('status', '!=', 'stale');
 
-        // Load from documents table as the primary source of truth.
-        // Filesystem reconciliation is deferred to SyncKnowledgeSource job.
-        $dbFiles = $source->documents()
-            ->where('status', '!=', 'stale')
-            ->latest()
-            ->limit(500)
-            ->get()
-            ->map(fn (Document $doc) => [
-                'path' => $doc->path,
-                'filename' => $doc->filename,
-                'size' => $doc->size_bytes ?? 0,
-                'is_document' => true,
-                'document_id' => $doc->id,
-                'document_status' => $doc->status,
-            ])
-            ->all();
+        // Apply search
+        if ($this->search !== '' && $this->search !== '0') {
+            $query->where('filename', 'ilike', '%'.$this->search.'%');
+        }
 
-        // Apply filter
+        // Apply status filter
         if ($this->filter !== 'all') {
-            $dbFiles = array_filter($dbFiles, fn ($f) => ($f['document_status'] ?? 'physical') === $this->filter);
+            $query->where('status', $this->filter);
         }
 
         // Apply sort
-        usort($dbFiles, function ($a, $b) {
-            $field = $this->sort['field'];
-            $dir = $this->sort['direction'] === 'asc' ? 1 : -1;
+        $sortField = in_array($this->sort['field'], ['filename', 'size_bytes']) ? $this->sort['field'] : 'filename';
+        $query->orderBy($sortField, $this->sort['direction']);
 
-            $aVal = $a[$field] ?? '';
-            $bVal = $b[$field] ?? '';
+        $paginator = $query->paginate(20);
 
-            return $dir * strcasecmp((string) $aVal, (string) $bVal);
-        });
+        $this->paginatorInstance = $paginator;
 
-        $this->files = array_values($dbFiles);
+        $this->files = collect($paginator->items())->map(fn (Document $doc) => [
+            'path' => $doc->path,
+            'filename' => $doc->filename,
+            'size' => $doc->size_bytes ?? 0,
+            'is_document' => true,
+            'document_id' => $doc->id,
+            'document_status' => $doc->status,
+        ])->all();
     }
 
     public function sortBy(string $field): void
@@ -200,9 +195,16 @@ class FileManager extends Component
         $this->refreshFiles();
     }
 
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+        $this->refreshFiles();
+    }
+
     public function setFilter(string $filter): void
     {
         $this->filter = $filter;
+        $this->resetPage();
         $this->refreshFiles();
     }
 
@@ -326,10 +328,18 @@ class FileManager extends Component
      */
     public function getStatsProperty(): array
     {
-        $total = count($this->files);
-        $indexed = count(array_filter($this->files, fn ($f) => ($f['document_status'] ?? '') === 'indexed'));
-        $error = count(array_filter($this->files, fn ($f) => ($f['document_status'] ?? '') === 'error'));
-        $discovered = count(array_filter($this->files, fn ($f) => in_array($f['document_status'] ?? '', ['discovered', 'parsed', 'chunked'], true)));
+        $source = KnowledgeSource::find($this->sourceId);
+
+        if (! $source) {
+            return ['total' => 0, 'indexed' => 0, 'error' => 0, 'discovered' => 0];
+        }
+
+        $query = $source->documents()->where('status', '!=', 'stale');
+
+        $total = (clone $query)->count();
+        $indexed = (clone $query)->where('status', 'indexed')->count();
+        $error = (clone $query)->where('status', 'error')->count();
+        $discovered = (clone $query)->whereNotIn('status', ['indexed', 'error'])->count();
 
         return compact('total', 'indexed', 'error', 'discovered');
     }
@@ -458,6 +468,11 @@ class FileManager extends Component
         $realPath = realpath(dirname($path)) ?: dirname($path);
 
         return str_starts_with($realPath, $realBase) && ! str_contains($path, '..');
+    }
+
+    public function getPaginatorProperty(): ?LengthAwarePaginator
+    {
+        return $this->paginatorInstance;
     }
 
     public function render(): View

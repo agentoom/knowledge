@@ -179,22 +179,33 @@
 
         {{-- Filter bar --}}
         <div class="px-6 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-2 flex-wrap">
-            <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Filter:</span>
-            @foreach ([
-                'all' => 'All',
-                'indexed' => 'Indexed',
-                'discovered' => 'Pending',
-                'error' => 'Errors',
-                'physical' => 'Disk Only',
-            ] as $value => $label)
-                <flux:button
+            <div class="flex-1 flex items-center gap-2 min-w-0">
+                <flux:input
+                    wire:model.live.debounce.300ms="search"
+                    placeholder="Search files..."
                     size="sm"
-                    variant="{{ $filter === $value ? 'primary' : 'ghost' }}"
-                    wire:click="setFilter('{{ $value }}')"
-                >
-                    {{ $label }}
-                </flux:button>
-            @endforeach
+                    class="max-w-xs"
+                    clearable
+                />
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Filter:</span>
+                @foreach ([
+                    'all' => 'All',
+                    'indexed' => 'Indexed',
+                    'discovered' => 'Pending',
+                    'error' => 'Errors',
+                    'chunked' => 'Chunked',
+                ] as $value => $label)
+                    <flux:button
+                        size="sm"
+                        variant="{{ $filter === $value ? 'primary' : 'ghost' }}"
+                        wire:click="setFilter('{{ $value }}')"
+                    >
+                        {{ $label }}
+                    </flux:button>
+                @endforeach
+            </div>
         </div>
 
         {{-- File listing --}}
@@ -318,6 +329,12 @@
                     </tbody>
                 </table>
             </div>
+
+            @if ($this->paginator && $this->paginator->hasPages())
+                <div class="px-6 py-3 border-t border-zinc-100 dark:border-zinc-800">
+                    {{ $this->paginator->links() }}
+                </div>
+            @endif
         @endif
     </div>
 

@@ -8,7 +8,6 @@ use App\Livewire\Admin\Documents\Show as DocumentsShow;
 use App\Livewire\Admin\Federation\Servers as FederationServers;
 use App\Livewire\Admin\Health\Dashboard as HealthDashboard;
 use App\Livewire\Admin\Jobs\Index as JobsIndex;
-use App\Livewire\Admin\KnowledgeSources\Create;
 use App\Livewire\Admin\KnowledgeSources\Index as KnowledgeSourcesIndex;
 use App\Livewire\Admin\KnowledgeSources\Show as KnowledgeSourcesShow;
 use App\Livewire\Admin\Mcp\ApiKeys as McpApiKeys;
