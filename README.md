@@ -325,6 +325,12 @@ vendor/bin/sail artisan horizon
 - **Phase 3:** Web Provider, Document Pipeline automation, Admin UI. ✅
 - **Phase 4:** Advanced chunking strategies, HTML-to-Markdown conversion, provider SDK formalization. ✅
 - **Phase 5:** True web crawling (domain recursive), MCP federation. ✅
+- **Phase 6:** Production hardening — Laravel scheduler for periodic maintenance (Horizon snapshots, federation sync, log pruning), rate limiting on the MCP API endpoint, health-check endpoint for Docker and load balancers, notification pipeline for sync failures and high-latency alerts.
+- **Phase 7:** Search quality — hybrid keyword+vector search in Typesense, content deduplication via SHA-256 hashing in the parse stage, configurable synonym expansion for query rewriting, recency-aware scoring in Reciprocal Rank Fusion so fresher content surfaces higher.
+- **Phase 8:** Provider completeness — external embedding provider implementation (OpenAI, Cohere, local HuggingFace) through the existing `EmbeddingProvider` contract, MCP resources for document and source browsing, **OCR fallback for images**: a local OCR engine (e.g., PaddleOCR) running in the same Docker stack that the pipeline calls only when Tika returns empty or near-empty content from image files (jpg, png, tiff, etc.), so image-based documents become searchable without external API dependencies. Non-image parsing stays on Tika; OCR is a targeted gap-filler, not a replacement.
+- **Phase 9:** Enterprise features — activity/audit trail tracking who changed what (sources, API keys, settings), token-aware chunking that respects LLM context windows, retry/reprocess mechanism for documents stuck in `error` status after transient Tika failures, knowledge source templates for one-click setup of common configurations.
+- **Phase 10:** Test coverage — dedicated tests for each provider (Yaml, Json, Markdown, Web, Sql), chunking strategy tests for all four strategies, Livewire component tests for Playground, ApiKeys, DangerZone, and Dashboard.
+- **Phase 11:** Future horizons — knowledge graph traversal, semantic caching of retrieval results, multi-tenancy with row-level data isolation (schema already has `tenant_id` columns), fine-tuned embedding models for domain-specific knowledge, and additional OCR/parser improvements.
 
 ## Plugin Ecosystem
 
@@ -348,12 +354,7 @@ Agentoom Knowledge is designed to be extended. Its modular architecture allows d
 
 ## Future
 
-The architecture of Agentoom Knowledge is built to support the next generation of AI infrastructure:
-
-- **Knowledge Graph Providers:** Incorporating relational context via graph traversal.
-- **Semantic Caching:** Intelligent caching of retrieval results to reduce latency.
-- **Fine-tuned Embedding Models:** Domain-specific embedding models for specialized knowledge domains.
-- **Multi-tenancy:** Hard row-level data isolation for multi-org SaaS deployments. The schema is ready (FK columns exist), but namespaces handle department-level separation just fine for self-hosted use.
+The architecture of Agentoom Knowledge is built to support the next generation of AI infrastructure. See [Phase 11](#roadmap) for forward-looking items including knowledge graphs, semantic caching, multi-tenancy, and fine-tuned embeddings.
 
 ## Relationship with Agentoom
 
