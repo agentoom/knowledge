@@ -53,22 +53,16 @@ class SearchKnowledge extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'query' => $schema->createStringSchema(
-                'The search query string.',
-            ),
-            'namespace' => $schema->createStringSchema(
-                'Optional namespace to scope the search (e.g., "docs", "erp", "hr").',
-            ),
-            'max_results' => $schema->createIntegerSchema(
-                'Maximum number of results to return. Defaults to 10.',
-            ),
-            'filters' => $schema->createObjectSchema(
-                'Optional structured filters for narrowing results. Keys and values depend on the provider.',
-                additionalProperties: $schema->createStringSchema('Filter value.'),
-            ),
-            'search_type' => $schema->createStringSchema(
-                'Optional search type: "semantic", "structured", or "hybrid". Defaults to "hybrid" which lets the planner decide.',
-            ),
+            'query' => $schema->string()
+                ->description('The search query string.'),
+            'namespace' => $schema->string()
+                ->description('Optional namespace to scope the search (e.g., "docs", "erp", "hr").'),
+            'max_results' => $schema->integer()
+                ->description('Maximum number of results to return. Defaults to 10.'),
+            'filters' => $schema->object()
+                ->description('Optional structured filters for narrowing results. Keys and values depend on the provider.'),
+            'search_type' => $schema->string()
+                ->description('Optional search type: "semantic", "structured", or "hybrid". Defaults to "hybrid" which lets the planner decide.'),
         ];
     }
 }

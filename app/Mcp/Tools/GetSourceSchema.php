@@ -60,9 +60,8 @@ class GetSourceSchema extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'source_id' => $schema->createStringSchema(
-                'The source identifier: either the provider class name or namespace (e.g., "App\\Providers\\Filesystem\\FilesystemProvider" or "docs").',
-            ),
+            'source_id' => $schema->string()
+                ->description('The source identifier: either the provider class name or namespace (e.g., "App\\Providers\\Filesystem\\FilesystemProvider" or "docs").'),
         ];
     }
 }

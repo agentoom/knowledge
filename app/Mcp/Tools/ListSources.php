@@ -50,9 +50,8 @@ class ListSources extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'namespace' => $schema->createStringSchema(
-                'Optional namespace to filter sources by (e.g., "docs", "erp").',
-            ),
+            'namespace' => $schema->string()
+                ->description('Optional namespace to filter sources by (e.g., "docs", "erp").'),
         ];
     }
 }
