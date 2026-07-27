@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class ChunkFactory extends Factory
 {
+    protected $model = Chunk::class;
+
     private static int $sequence = 0;
 
     /**

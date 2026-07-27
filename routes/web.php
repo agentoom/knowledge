@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Role;
+use App\Http\Controllers\HealthController;
 use App\Livewire\Admin\Chunks\Index as ChunksIndex;
 use App\Livewire\Admin\Dashboard\Index as DashboardIndex;
 use App\Livewire\Admin\Documents\Index as DocumentsIndex;
@@ -8,7 +9,6 @@ use App\Livewire\Admin\Documents\Show as DocumentsShow;
 use App\Livewire\Admin\Federation\Servers as FederationServers;
 use App\Livewire\Admin\Health\Dashboard as HealthDashboard;
 use App\Livewire\Admin\Jobs\Index as JobsIndex;
-use App\Livewire\Admin\KnowledgeSources\Create;
 use App\Livewire\Admin\KnowledgeSources\Index as KnowledgeSourcesIndex;
 use App\Livewire\Admin\KnowledgeSources\Show as KnowledgeSourcesShow;
 use App\Livewire\Admin\Mcp\ApiKeys as McpApiKeys;
@@ -87,3 +87,5 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/settings.php';
+
+Route::get('/health', [HealthController::class, 'check'])->name('health');

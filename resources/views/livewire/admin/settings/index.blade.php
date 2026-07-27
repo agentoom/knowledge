@@ -14,6 +14,8 @@
                 'vector-store'  => 'Vector Store',
                 'storage'       => 'Storage',
                 'notifications' => 'Notifications',
+                'rate-limiting' => 'Rate Limiting',
+                'maintenance'   => 'Maintenance',
                 'danger-zone'   => 'Danger Zone',
             ] as $value => $label)
                 <button
@@ -54,6 +56,12 @@
     </div>
     <div wire:key="tab-notifications" @class(['hidden' => $tab !== 'notifications'])>
         @livewire(\App\Livewire\Admin\Settings\Notifications::class)
+    </div>
+    <div wire:key="tab-rate-limiting" @class(['hidden' => $tab !== 'rate-limiting'])>
+        @livewire(\App\Livewire\Admin\Settings\RateLimiting::class)
+    </div>
+    <div wire:key="tab-maintenance" @class(['hidden' => $tab !== 'maintenance'])>
+        @livewire(\App\Livewire\Admin\Settings\Maintenance::class)
     </div>
     <div wire:key="tab-danger-zone" @class(['hidden' => $tab !== 'danger-zone'])>
         @livewire(\App\Livewire\Admin\Settings\DangerZone::class)

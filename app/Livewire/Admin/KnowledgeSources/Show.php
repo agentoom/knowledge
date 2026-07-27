@@ -7,6 +7,7 @@ use App\Knowledge\Enums\ProviderType;
 use App\Knowledge\Models\KnowledgeSource;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\View\View;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 class Show extends Component
@@ -33,15 +34,16 @@ class Show extends Component
 
     public int $activeDocumentCount = 0;
 
-    /**
-     * @var array<int, array<string, mixed>>
-     */
+    /** @var array<int, array<string, mixed>> */
     public array $documents = [];
 
-    /**
-     * @var array<string, mixed>
-     */
+    /** @var array<string, mixed> */
     public array $providerConfig = [];
+
+    public bool $isEditing = false;
+
+    #[Url]
+    public bool $edit = false;
 
     public bool $isEditingConfig = false;
 
@@ -76,9 +78,13 @@ class Show extends Component
 
     public bool $showFileManager = false;
 
+    public bool $showSourceTypesHelp = false;
+
     public function mount(int $source): void
     {
         $this->sourceId = $source;
+        $this->isEditing = $this->edit;
+        $this->edit = false; // consume the flag — don't persist in URL
         $loaded = KnowledgeSource::with(['providers', 'documents'])->findOrFail($source);
 
         $this->name = $loaded->name;
@@ -115,6 +121,102 @@ class Show extends Component
             ->all();
     }
 
+    public function cancelEdit(): void
+    {
+        $this->isEditing = false;
+        $loaded = KnowledgeSource::findOrFail($this->sourceId);
+        $this->name = $loaded->name;
+        $this->namespace = $loaded->namespace;
+        $this->providerType = $loaded->provider_type;
+        $this->description = $loaded->description;
+        $this->isActive = $loaded->is_active;
+        $this->showFileManager = ProviderType::tryFrom($this->providerType)?->isFilesystemBacked() ?? false;
+        $this->loadConfigIntoFormFields($loaded);
+    }
+
+    public function save(): void
+    {
+        $validTypes = implode(',', ['filesystem', 'yaml', 'json', 'markdown', 'sql', 'web']);
+
+        $rules = [
+            'name' => 'required|string|max:255',
+            'namespace' => 'required|string|max:100',
+            'providerType' => "required|string|in:{$validTypes}",
+        ];
+
+        if ($this->providerType === 'sql') {
+            $rules = array_merge($rules, $this->sqlRules());
+        } elseif ($this->providerType === 'web') {
+            $rules['configUrls'] = 'required|string';
+        } else {
+            $rules['configBasePath'] = 'nullable|string|max:512';
+        }
+
+        $this->validate($rules);
+
+        $source = KnowledgeSource::findOrFail($this->sourceId);
+        $source->update([
+            'name' => $this->name,
+            'slug' => str($this->name)->slug(),
+            'namespace' => $this->namespace,
+            'provider_type' => $this->providerType,
+            'description' => $this->description,
+            'is_active' => $this->isActive,
+            'provider_config' => $this->buildProviderConfig(),
+        ]);
+
+        $this->providerConfig = $source->refresh()->provider_config;
+        $this->configJson = (string) json_encode($this->providerConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $this->showFileManager = ProviderType::tryFrom($this->providerType)?->isFilesystemBacked() ?? false;
+        $this->isEditing = false;
+        $this->isEditingConfig = false;
+
+        session()->flash('status', 'Knowledge source updated.');
+    }
+
+    public function saveConfig(): void
+    {
+        if ($this->useFormEditor) {
+            $this->saveConfigFromForm();
+
+            return;
+        }
+
+        $this->validate(['configJson' => 'required|json']);
+
+        $source = KnowledgeSource::findOrFail($this->sourceId);
+        $source->update(['provider_config' => json_decode($this->configJson, true)]);
+
+        $this->providerConfig = $source->provider_config;
+        $this->isEditingConfig = false;
+
+        session()->flash('status', 'Configuration updated.');
+    }
+
+    public function startSync(): void
+    {
+        app(PipelineOrchestrator::class)->run(KnowledgeSource::findOrFail($this->sourceId));
+
+        session()->flash('status', 'Pipeline started.');
+    }
+
+    public function getRedactedProviderConfigProperty(): array
+    {
+        return $this->redactSecrets($this->providerConfig);
+    }
+
+    public function getProviderTypeLabelProperty(): string
+    {
+        $type = ProviderType::tryFrom($this->providerType);
+
+        return $type?->label() ?? $this->providerType;
+    }
+
+    public function getAcceptedFormatsLabelProperty(): string
+    {
+        return ProviderType::tryFrom($this->providerType)?->acceptedFormatsLabel() ?? '';
+    }
+
     private function loadConfigIntoFormFields(KnowledgeSource $source): void
     {
         $config = $source->provider_config ?? [];
@@ -141,33 +243,10 @@ class Show extends Component
         }
     }
 
-    public function saveConfig(): void
-    {
-        if ($this->useFormEditor) {
-            $this->saveConfigFromForm();
-
-            return;
-        }
-
-        $this->validate([
-            'configJson' => 'required|json',
-        ]);
-
-        $source = KnowledgeSource::findOrFail($this->sourceId);
-        $source->update([
-            'provider_config' => json_decode($this->configJson, true),
-        ]);
-
-        $this->providerConfig = $source->provider_config;
-        $this->isEditingConfig = false;
-
-        session()->flash('status', 'Configuration updated successfully.');
-    }
-
-    public function saveConfigFromForm(): void
+    private function saveConfigFromForm(): void
     {
         $rules = match ($this->providerType) {
-            'sql' => $this->sqlFormRules(),
+            'sql' => $this->sqlRules(),
             'filesystem', 'yaml', 'json', 'markdown' => ['configBasePath' => 'nullable|string|max:512'],
             'web' => ['configUrls' => 'required|string'],
             default => [],
@@ -182,20 +261,31 @@ class Show extends Component
             default => [],
         };
 
-        $source = KnowledgeSource::findOrFail($this->sourceId);
-        $source->update(['provider_config' => $config]);
-
-        $this->providerConfig = $source->provider_config;
-        $this->configJson = (string) json_encode($this->providerConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        KnowledgeSource::findOrFail($this->sourceId)->update(['provider_config' => $config]);
+        $this->providerConfig = $config;
+        $this->configJson = (string) json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         $this->isEditingConfig = false;
 
-        session()->flash('status', 'Configuration updated successfully.');
+        session()->flash('status', 'Configuration updated.');
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, mixed>
      */
-    private function sqlFormRules(): array
+    private function buildProviderConfig(): array
+    {
+        return match ($this->providerType) {
+            'sql' => $this->buildSqlFormConfig(),
+            'filesystem', 'yaml', 'json', 'markdown' => empty($this->configBasePath) ? [] : ['basePath' => $this->configBasePath],
+            'web' => ['urls' => array_filter(explode("\n", str_replace("\r", '', $this->configUrls)))],
+            default => [],
+        };
+    }
+
+    /**
+     * @return array<string, array<string, string>|string>
+     */
+    private function sqlRules(): array
     {
         if ($this->configUseDynamicConnection) {
             return [
@@ -240,37 +330,6 @@ class Show extends Component
         return $config;
     }
 
-    public function startSync(): void
-    {
-        $source = KnowledgeSource::findOrFail($this->sourceId);
-
-        app(PipelineOrchestrator::class)->run($source);
-
-        session()->flash('status', 'Discovery and indexing pipeline started.');
-    }
-
-    /**
-     * Provider config with passwords redacted for display.
-     *
-     * @return array<string, mixed>
-     */
-    public function getRedactedProviderConfigProperty(): array
-    {
-        return $this->redactSecrets($this->providerConfig);
-    }
-
-    public function getProviderTypeLabelProperty(): string
-    {
-        $type = ProviderType::tryFrom($this->providerType);
-
-        return $type?->label() ?? $this->providerType;
-    }
-
-    public function getAcceptedFormatsLabelProperty(): string
-    {
-        return ProviderType::tryFrom($this->providerType)?->acceptedFormatsLabel() ?? '';
-    }
-
     /**
      * @param  array<string, mixed>  $config
      * @return array<string, mixed>
@@ -301,9 +360,6 @@ class Show extends Component
         return $config;
     }
 
-    /**
-     * Try to decrypt a value, returning it as-is if decryption fails.
-     */
     private function tryDecrypt(string $value): string
     {
         if ($value === '') {
@@ -320,6 +376,6 @@ class Show extends Component
     public function render(): View
     {
         return view('livewire.admin.knowledge-sources.show')
-            ->layout('layouts.app', ['header' => 'Knowledge Source Detail']);
+            ->layout('layouts.app', ['header' => 'Knowledge Source']);
     }
 }

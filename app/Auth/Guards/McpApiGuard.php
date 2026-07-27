@@ -17,11 +17,22 @@ class McpApiGuard implements Guard
 
     public function user(): ?Authenticatable
     {
+        // Always set the API key ID attribute for rate limiting,
+        // even when the guard user is cached (critical for test isolation).
+        $token = $this->request->bearerToken();
+
+        if ($token !== null && $token !== '') {
+            $keyPrefix = substr($token, 0, 8);
+            $apiKeyForRateLimit = ApiKey::where('key_prefix', $keyPrefix)->first();
+
+            if ($apiKeyForRateLimit !== null) {
+                $this->request->attributes->set('mcp_api_key_id', $apiKeyForRateLimit->id);
+            }
+        }
+
         if ($this->user !== null) {
             return $this->user;
         }
-
-        $token = $this->request->bearerToken();
 
         if ($token === null || $token === '') {
             return null;
@@ -44,6 +55,8 @@ class McpApiGuard implements Guard
         }
 
         $apiKey->update(['last_used_at' => now()]);
+
+        $this->request->attributes->set('mcp_api_key_id', $apiKey->id);
 
         /** @var Authenticatable|null $authenticatedUser */
         $authenticatedUser = $apiKey->user ?? $this->createServiceAccountUser($apiKey);

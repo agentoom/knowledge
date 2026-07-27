@@ -24,6 +24,11 @@ services:
         condition: service_healthy
     networks:
       - agentoom
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   nginx:
     image: nginx:alpine
@@ -84,6 +89,11 @@ services:
       - app
     networks:
       - agentoom
+    healthcheck:
+      test: ["CMD", "php", "artisan", "horizon:status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   # Scheduler (cron)
   scheduler:

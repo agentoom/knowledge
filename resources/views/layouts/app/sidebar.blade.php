@@ -33,15 +33,15 @@
                     <flux:sidebar.item icon="key" :href="route('admin.mcp.api-keys')" :current="request()->routeIs('admin.mcp.*')" wire:navigate>
                         MCP
                     </flux:sidebar.item>
-                    <flux:sidebar.item icon="users" :href="route('admin.users.index')" :current="request()->routeIs('admin.users.*')" wire:navigate>
-                        Users
-                    </flux:sidebar.item>
                     <flux:sidebar.item icon="heart" :href="route('admin.health')" :current="request()->routeIs('admin.health')" wire:navigate>
                         Health
                     </flux:sidebar.item>
                 </flux:sidebar.group>
 
                 <flux:sidebar.group :heading="__('Settings')" class="grid">
+                    <flux:sidebar.item icon="users" :href="route('admin.users.index')" :current="request()->routeIs('admin.users.*')" wire:navigate>
+                        Users
+                    </flux:sidebar.item>
                     <flux:sidebar.item icon="cog" :href="route('admin.settings')" :current="request()->routeIs('admin.settings')" wire:navigate>
                         Settings
                     </flux:sidebar.item>

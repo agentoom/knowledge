@@ -59,7 +59,9 @@
         "knowledge:demo": [
             "@php artisan db:seed --class=KnowledgeDemoSeeder",
             "@php artisan knowledge:chunks:index",
-            "@php artisan knowledge:registry:refresh"
+            "@php artisan knowledge:providers:sync",
+            "@php artisan knowledge:registry:refresh",
+            "@php artisan app:federation-sync"
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",

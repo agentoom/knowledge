@@ -2,6 +2,8 @@
 
 namespace App\Knowledge\Models;
 
+use Database\Factories\ChunkFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -9,8 +11,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property array<string, mixed>|null $metadata
  * @property Document|null $document
  */
+/**
+ * @mixin HasFactory<ChunkFactory>
+ */
 class Chunk extends Model
 {
+    /** @use HasFactory<ChunkFactory> */
+    use HasFactory;
+
+    protected static function newFactory(): ChunkFactory
+    {
+        return ChunkFactory::new();
+    }
+
     protected $fillable = [
         'document_id',
         'sequence',

@@ -3,6 +3,8 @@
 namespace App\Knowledge\Models;
 
 use App\Jobs\DocumentPipeline\DeindexDocument;
+use Database\Factories\DocumentFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,8 +14,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property array<string, mixed>|null $provider_config
  * @property KnowledgeSource|null $knowledgeSource
  */
+/**
+ * @mixin HasFactory<DocumentFactory>
+ */
 class Document extends Model
 {
+    /** @use HasFactory<DocumentFactory> */
+    use HasFactory;
+
+    protected static function newFactory(): DocumentFactory
+    {
+        return DocumentFactory::new();
+    }
+
     protected $fillable = [
         'knowledge_source_id',
         'path',
