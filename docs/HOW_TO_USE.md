@@ -18,6 +18,7 @@ This guide walks you through the core workflows. You should have completed the [
 - [MCP: Connecting AI Agents](#mcp-connecting-ai-agents)
 - [Federation](#federation)
 - [Users and Roles](#users-and-roles)
+- [Settings](#settings)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -250,7 +251,47 @@ Manage users from **Users** in the sidebar (admin only).
 
 ---
 
+## Settings
+
+The **Settings** page (sidebar → Settings) centralizes all system configuration across multiple tabs:
+
+### Rate Limiting
+
+Protect the MCP API endpoint from abuse:
+- **Enable/disable** rate limiting with a toggle
+- **Requests per minute:** set the maximum number of requests each API key can make per minute (default: 60)
+- When a key exceeds the limit, subsequent requests receive `429 Too Many Requests` until the window resets
+
+### Maintenance
+
+Configure periodic maintenance tasks:
+- **Federation sync interval:** how often remote server capabilities are refreshed (default: 15 minutes)
+- **Log pruning:** automatically delete old application log files to conserve disk space (configurable retention)
+- **Retrieval log pruning:** automatically delete old search history from the database (configurable retention)
+
+### Notifications
+
+Configure where and when operational alerts are sent:
+- **Email notifications:** toggle on/off, enter one or more comma-separated email addresses
+- **Webhook notifications:** toggle on/off, enter a Slack/Discord/Teams webhook URL — a preview of the JSON payload format is shown
+- **Thresholds:** set the search latency alert threshold (ms), consecutive sync failure count before alerting, and the cooldown window between duplicate alerts
+- **Alert types:** individually enable/disable alerts for search latency, sync failures, and federation failures
+
+All notification settings take effect immediately — no restart required.
+
+---
+
 ## Troubleshooting
+
+### Health Check
+
+Quickly verify all critical services are running:
+
+```bash
+curl http://localhost/health
+```
+
+Returns `{"status":"ok",...}` when database, Redis, Typesense, and storage are all healthy.
 
 ### Resetting the application
 

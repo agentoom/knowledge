@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Role;
+use App\Http\Controllers\HealthController;
 use App\Livewire\Admin\Chunks\Index as ChunksIndex;
 use App\Livewire\Admin\Dashboard\Index as DashboardIndex;
 use App\Livewire\Admin\Documents\Index as DocumentsIndex;
@@ -86,3 +87,5 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/settings.php';
+
+Route::get('/health', [HealthController::class, 'check'])->name('health');

@@ -157,18 +157,22 @@ Security is a first-class citizen in Agentoom Knowledge, especially given the se
 *   **MCP API Guard:** All requests to the MCP server are protected by a custom `mcp_api` authentication guard.
 *   **API Keys:** Access is managed through API Keys with granular scopes (e.g., `mcp:use`, `admin:*`). These keys must be provided as Bearer tokens in the MCP connection.
 *   **Multi-tenancy Ready:** While currently focused on single-instance enterprise deployment, the core data models (`KnowledgeSource`, `Provider`, `Document`, `ApiKey`) include `tenant_id` columns with foreign key constraints, ensuring that future multi-tenant deployments have logical isolation at the database and retrieval layers.
+*   **Rate Limiting:** The MCP API endpoint is protected by configurable per-API-key rate limiting (default: 60 requests/minute). Limits are managed from the Admin UI under **Settings → Rate Limiting** and can be disabled per deployment.
 
 ### Lifecycle Automation & Syncing
 The system handles the complexity of keeping knowledge sources in sync through an automated lifecycle:
 *   **Source Observers:** When a `KnowledgeSource` is created or updated in the Admin panel, Eloquent Observers automatically manage the underlying `Provider` models and their technical configurations.
 *   **Pipeline Orchestration:** New documents are automatically routed through a multi-stage pipeline (Discover → Parse → Normalize → Chunk → Enrich → Index) via batched queue jobs.
 *   **Artisan Commands:** `knowledge:pipeline:run` triggers document discovery and processing for active sources.
+*   **Scheduled Maintenance:** The Laravel scheduler runs periodic tasks — Horizon metric snapshots every 5 minutes, federation capability sync every 15 minutes, and daily retrieval log pruning (configurable from **Settings → Maintenance**).
 
 ### Observability & The Search Playground
 Agentoom Knowledge provides deep visibility into its "black box" retrieval logic:
 *   **Retrieval Logging:** Every request processed by the engine is logged with its full query, deterministic execution plan, fused results, and precise latency metrics.
 *   **Search Playground:** An interactive internal tool allows administrators to simulate agent requests. It visualizes the **Reasoning** (the step-by-step execution plan) alongside the **Evidence** (the final ranked results), making it easy to debug retrieval quality.
 *   **Performance Metrics:** The dashboard tracks real-time health, including Horizon queue status and vector store (Typesense) metrics, ensuring the system remains responsive under load.
+*   **Health Endpoint:** A `GET /health` JSON endpoint reports the status of database, Redis, Typesense, and storage. Designed for Docker healthchecks, Kubernetes probes, and load-balancer monitoring — returns 200 when all services are healthy, 503 if any critical service is down.
+*   **Notification Pipeline:** Configurable email and webhook alerts for operational events — high search latency, consecutive sync failures, and federation errors. Thresholds, alert types, and cooldown windows are managed from the Admin UI under **Settings → Notifications**.
 
 ### Federation
 Agentoom Knowledge servers can be federated so that a single instance queries multiple servers transparently:
@@ -215,6 +219,10 @@ The `WebProvider` fetches and converts content from configured URLs into searcha
 - **Search Playground:** Interactive sandbox to test queries and visualize retrieval plans in real time.
 - **Danger Zone Reset:** One-click app reset from Settings — clears all knowledge data, search indexes, and logs while preserving users and configuration.
 - **API Key Auth:** Scoped API key authentication for MCP access with separate user/service-account keys and prefix-optimized lookups.
+- **Rate Limiting:** Configurable per-API-key rate limiting on the MCP endpoint to prevent abuse.
+- **Health Endpoint:** `GET /health` JSON endpoint for Docker healthchecks and load-balancer probes — checks database, Redis, Typesense, and storage.
+- **Notification Pipeline:** Email and webhook alerts for high search latency, sync failures, and federation errors — configurable thresholds, alert types, and cooldown windows.
+- **Scheduler Maintenance:** Automated Horizon metric snapshots, federation capability sync, and retrieval log pruning via Laravel's scheduler.
 - **Horizon Queues:** Background indexing and document processing via Redis queues.
 - **Apache Tika Integration:** Robust parsing for hundreds of document formats (PDF, DOCX, etc.).
 - **Passkeys + 2FA:** Fortify-powered authentication with passkeys and TOTP two-factor auth.
@@ -325,7 +333,7 @@ vendor/bin/sail artisan horizon
 - **Phase 3:** Web Provider, Document Pipeline automation, Admin UI. ✅
 - **Phase 4:** Advanced chunking strategies, HTML-to-Markdown conversion, provider SDK formalization. ✅
 - **Phase 5:** True web crawling (domain recursive), MCP federation. ✅
-- **Phase 6:** Production hardening — Laravel scheduler for periodic maintenance (Horizon snapshots, federation sync, log pruning), rate limiting on the MCP API endpoint, health-check endpoint for Docker and load balancers, notification pipeline for sync failures and high-latency alerts.
+- **Phase 6:** Production hardening — Laravel scheduler for periodic maintenance (Horizon snapshots, federation sync, log pruning), rate limiting on the MCP API endpoint, health-check endpoint for Docker and load balancers, notification pipeline for sync failures and high-latency alerts. ✅
 - **Phase 7:** Search quality — hybrid keyword+vector search in Typesense, content deduplication via SHA-256 hashing in the parse stage, configurable synonym expansion for query rewriting, recency-aware scoring in Reciprocal Rank Fusion so fresher content surfaces higher.
 - **Phase 8:** Provider completeness — external embedding provider implementation (OpenAI, Cohere, local HuggingFace) through the existing `EmbeddingProvider` contract, MCP resources for document and source browsing, **OCR fallback for images**: a local OCR engine (e.g., PaddleOCR) running in the same Docker stack that the pipeline calls only when Tika returns empty or near-empty content from image files (jpg, png, tiff, etc.), so image-based documents become searchable without external API dependencies. Non-image parsing stays on Tika; OCR is a targeted gap-filler, not a replacement.
 - **Phase 9:** Enterprise features — activity/audit trail tracking who changed what (sources, API keys, settings), token-aware chunking that respects LLM context windows, retry/reprocess mechanism for documents stuck in `error` status after transient Tika failures, knowledge source templates for one-click setup of common configurations.

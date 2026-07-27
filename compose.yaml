@@ -27,6 +27,14 @@ services:
             - redis
             - typesense
             - tika
+        healthcheck:
+            test:
+                - CMD
+                - curl
+                - '-f'
+                - 'http://localhost/health'
+            retries: 3
+            timeout: 5s
     pgsql:
         image: 'postgres:18-alpine'
         ports:

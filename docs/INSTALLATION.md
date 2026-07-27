@@ -75,6 +75,7 @@ php artisan knowledge:install
 | `knowledge:providers:list` | List all registered knowledge providers |
 | `knowledge:providers:sync` | Sync provider metadata and status from sources |
 | `knowledge:registry:refresh` | Rebuild the metadata registry |
+| `app:federation-sync` | Manually sync capabilities from remote federation servers |
 | `make:knowledge-provider` | Scaffold a new custom Knowledge Provider |
 
 ## Running Tests
@@ -86,6 +87,16 @@ php artisan test --compact
 The `.env.testing` file provides CI-friendly defaults (SQLite in-memory, array cache, sync queue). Tests that exercise Typesense need Docker services running.
 
 ## Troubleshooting
+
+### Health Check
+
+Verify all critical services are running:
+
+```bash
+curl http://localhost/health
+```
+
+Returns JSON with the status of database, Redis, Typesense, and storage. HTTP 200 = all healthy, HTTP 503 = at least one service is down.
 
 ### "Unsupported cipher or incorrect key length"
 

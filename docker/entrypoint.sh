@@ -19,6 +19,10 @@ fi
 # Build registry
 php artisan knowledge:registry:refresh --no-interaction
 
+# Sync provider metadata and federation capabilities
+php artisan knowledge:providers:sync --no-interaction
+php artisan app:federation-sync --no-interaction
+
 # Cache for production
 php artisan config:cache
 php artisan route:cache
