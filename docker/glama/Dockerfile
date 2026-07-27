@@ -42,6 +42,7 @@ RUN composer install \
 COPY . .
 
 # Run post-install scripts now that all files are present
+# Skip artisan commands at build time — they need env vars only available at runtime
 RUN composer run-script post-autoload-dump --no-interaction
 
 # Ensure writable directories
@@ -58,3 +59,4 @@ RUN addgroup -S app && adduser -S -G app app \
 USER app
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["php", "artisan", "mcp:start", "knowledge"]

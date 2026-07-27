@@ -8,15 +8,6 @@
         "file": "docker/glama/Dockerfile"
     },
     "runtime": {
-        "command": "/usr/local/bin/entrypoint.sh",
-        "args": [
-            {
-                "name": "--env",
-                "description": "Runtime environment variables:",
-                "type": "string",
-                "required": false,
-                "default": "DB_CONNECTION, DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD, REDIS_HOST, REDIS_PORT, TYPESENSE_HOST, TYPESENSE_PORT, TYPESENSE_API_KEY, TYPESENSE_PROTOCOL, TIKA_ENDPOINT, SCOUT_DRIVER, QUEUE_CONNECTION, CACHE_STORE"
-            }
-        ]
+        "command": "/usr/local/bin/entrypoint.sh"
     }
 }
