@@ -18,6 +18,11 @@ class NormalizeDocument implements ShouldQueue
     {
         $document = Document::findOrFail($this->documentId);
 
+        // Skip documents that were not successfully parsed (e.g., duplicates, errors).
+        if ($document->status !== 'parsed') {
+            return;
+        }
+
         $content = $document->content ?? '';
 
         if ($content === '' || $content === '0') {

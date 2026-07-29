@@ -25,10 +25,9 @@ This guide walks you through the core workflows. You should have completed the [
 
 ## Logging In
 
-Open your application URL and log in with your admin credentials:
+Open your application URL and log in with your admin credentials.
 
-- **Email:** `admin@agentoom.com` (or `knowledge@agentoom.com` if created via `knowledge:install`)
-- **Password:** the password you set (default: `changeme`)
+The admin user is created during seeding. If you didn't set `ADMIN_EMAIL` / `ADMIN_PASSWORD` in your `.env`, the password was randomly generated and printed to the console during seeding (also saved to `storage/app/initial-admin-password.txt`).
 
 > Change the default password immediately: click your avatar → **Profile** → update password.
 

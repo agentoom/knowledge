@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Actions\ResolveAdminCredentials;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -19,13 +20,24 @@ class DatabaseSeeder extends Seeder
             KnowledgeDemoSeeder::class,
         ]);
 
+        $credentials = ResolveAdminCredentials::resolve();
+
         User::firstOrCreate(
-            ['email' => 'admin@agentoom.com'],
+            ['email' => $credentials['email']],
             [
                 'name' => 'Admin',
-                'password' => 'changeme',
+                'password' => $credentials['password'],
                 'role' => 'admin',
             ]
         );
+
+        if (app()->runningInConsole()) {
+            ResolveAdminCredentials::outputToConsole(
+                $this->command,
+                $credentials['email'],
+                $credentials['password'],
+                $credentials['wasGenerated']
+            );
+        }
     }
 }

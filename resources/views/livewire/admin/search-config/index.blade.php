@@ -41,6 +41,81 @@
             </div>
         </flux:card>
 
+        {{-- Hybrid Search --}}
+        <flux:heading size="lg" class="mb-4">Hybrid Search</flux:heading>
+
+        <flux:card class="mb-6">
+            <div class="space-y-6">
+                <flux:field>
+                    <flux:label>Hybrid Alpha (Keyword vs. Vector Weight)</flux:label>
+                    <div class="flex items-center gap-4">
+                        <flux:input type="range" wire:model.live="hybridAlpha" min="0" max="1" step="0.1" class="flex-1" />
+                        <span class="w-10 text-center text-sm font-mono font-semibold text-zinc-900 dark:text-white">{{ number_format($hybridAlpha, 1) }}</span>
+                    </div>
+                    <flux:error name="hybridAlpha" />
+                    <flux:description>
+                        Controls the balance between keyword and vector (semantic) search in hybrid mode. <strong>0.0 = pure vector</strong>, <strong>1.0 = pure keyword</strong>, <strong>0.5 = equal weight</strong> (default). Takes effect when <code>search_type=hybrid</code>.
+                    </flux:description>
+                </flux:field>
+            </div>
+        </flux:card>
+
+        {{-- Recency Boost --}}
+        <flux:heading size="lg" class="mb-4">Recency Boost</flux:heading>
+
+        <flux:card class="mb-6">
+            <div class="space-y-6">
+                <flux:field>
+                    <div class="flex items-center gap-3">
+                        <flux:switch wire:model.live="recencyBoostEnabled" />
+                        <flux:label>Enable Recency Boost</flux:label>
+                    </div>
+                    <flux:description>
+                        When enabled, recently-indexed content gets a scoring boost in fused results. Older content is not penalized — it simply doesn't receive the recency bonus.
+                    </flux:description>
+                </flux:field>
+
+                @if ($recencyBoostEnabled)
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <flux:field>
+                            <flux:label>Boost Factor</flux:label>
+                            <flux:input type="number" wire:model="recencyBoostFactor" min="0" max="1" step="0.05" />
+                            <flux:error name="recencyBoostFactor" />
+                            <flux:description>
+                                Maximum boost multiplier for brand-new content (0.0–1.0). At 0.3, a fresh item gets up to 1.3× its unboosted score.
+                            </flux:description>
+                        </flux:field>
+
+                        <flux:field>
+                            <flux:label>Half-Life (days)</flux:label>
+                            <flux:input type="number" wire:model="recencyBoostHalfLifeDays" min="1" max="365" />
+                            <flux:error name="recencyBoostHalfLifeDays" />
+                            <flux:description>
+                                Number of days after which the boost drops to half its original value (1–365). At the default of 30 days, a one-month-old document gets 50% of the recency bonus.
+                            </flux:description>
+                        </flux:field>
+                    </div>
+                @endif
+            </div>
+        </flux:card>
+
+        {{-- Synonym Expansion --}}
+        <flux:heading size="lg" class="mb-4">Synonym Expansion</flux:heading>
+
+        <flux:card class="mb-6">
+            <div class="space-y-6">
+                <flux:field>
+                    <div class="flex items-center gap-3">
+                        <flux:switch wire:model="synonymExpansionEnabled" />
+                        <flux:label>Enable Synonym Expansion</flux:label>
+                    </div>
+                    <flux:description>
+                        When enabled, search queries are automatically expanded using configured synonym groups. For example, a query for "car" would also match "automobile", "vehicle", etc.
+                    </flux:description>
+                </flux:field>
+            </div>
+        </flux:card>
+
         {{-- Chunking --}}
         <flux:heading size="lg" class="mb-4">Chunking</flux:heading>
 

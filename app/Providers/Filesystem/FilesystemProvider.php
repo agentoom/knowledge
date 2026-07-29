@@ -48,18 +48,70 @@ class FilesystemProvider implements FilesystemKnowledgeProvider
     public function search(SearchQuery $query): SearchResult
     {
         $files = $this->discoverFiles();
+        $queryStr = $query->query;
+        $maxContentSize = config('knowledge.max_content_search_size', 1024 * 1024); // 1MB default
 
-        $matched = $files->filter(function (array $file) use ($query) {
-            if (empty($query->query)) {
-                return true;
-            }
+        $matched = $files
+            ->map(function (array $file) use ($queryStr, $maxContentSize) {
+                $filenameMatch = empty($queryStr)
+                    || stripos($file['filename'], $queryStr) !== false;
 
-            return stripos($file['filename'], $query->query) !== false;
-        });
+                $contentSnippet = '';
+                $contentMatch = false;
+
+                if (! empty($queryStr) && $file['size'] <= $maxContentSize) {
+                    try {
+                        $content = @file_get_contents($file['path'], false, null, 0, $maxContentSize);
+
+                        if ($content !== false) {
+                            $pos = mb_stripos($content, $queryStr);
+
+                            if ($pos !== false) {
+                                $contentMatch = true;
+                                $start = max(0, $pos - 80);
+                                $snippet = mb_substr($content, $start, 200);
+                                $contentSnippet = ($start > 0 ? '…' : '').trim($snippet).((mb_strlen($content) > $start + 200) ? '…' : '');
+                            }
+                        }
+                    } catch (\Throwable) {
+                        // Skip files that can't be read
+                    }
+                }
+
+                if (! $filenameMatch && ! $contentMatch && ! empty($queryStr)) {
+                    return null;
+                }
+
+                $score = 0.0;
+
+                if ($filenameMatch) {
+                    $score += 0.7;
+                }
+
+                if ($contentMatch) {
+                    $score += 0.3;
+                }
+
+                return [
+                    'id' => md5($file['path']),
+                    'title' => $file['filename'],
+                    'content' => $contentSnippet ?: 'File: '.$file['filename'].' ('.round($file['size'] / 1024, 1).' KB)',
+                    'score' => $score,
+                    'metadata' => [
+                        'provider' => 'filesystem',
+                        'source' => $file['path'],
+                        'size' => $file['size'],
+                    ],
+                ];
+            })
+            ->filter()
+            ->sortByDesc('score')
+            ->values()
+            ->all();
 
         return new SearchResult(
-            items: $matched->values()->all(),
-            totalCount: $matched->count(),
+            items: $matched,
+            totalCount: count($matched),
             providerName: 'filesystem',
         );
     }

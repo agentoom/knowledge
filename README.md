@@ -191,6 +191,42 @@ The document pipeline uses content-type-aware chunking to preserve semantic mean
 
 The `ChunkingStrategyRegistry` automatically selects the best strategy based on MIME type and file extension.
 
+### Search Quality
+
+Phase 7 introduced four orthogonal search quality improvements that operate across the retrieval pipeline:
+
+#### Hybrid Keyword+Vector Search
+When `search_type=hybrid`, the `SemanticProvider` sends both a keyword query and a vector query to Typesense in a single request. Typesense fuses the results using its built-in hybrid ranking, balancing keyword precision with semantic recall.
+
+- **Configurable Alpha:** The keyword vs. vector weight is controlled by the `knowledge.hybrid_alpha` setting (0.0–1.0, default 0.5). Admin UI provides a slider under **Settings → Search Config**.
+- **Managed Embeddings:** Uses the existing `ts/all-MiniLM-L12-v2` model configured during indexing — no external embedding calls needed.
+- **Fully Optional:** Default search (`search_type` null/absent) remains keyword-only for backward compatibility.
+
+#### Content Deduplication via SHA-256
+Duplicate content is detected and blocked at multiple stages of the document pipeline to prevent redundant indexing:
+
+- **Upload-time dedup:** The `FileManager` computes `hash_file('sha256', …)` on every uploaded file and filters out records whose hash already exists in the database (excluding stale/error documents). Within-batch duplicates (same file dragged twice) are also caught via a local dedup map.
+- **Parse-stage dedup:** `ParseDocument` computes `hash('sha256', $content)` after Tika extraction. If the content hash matches an existing non-stale document, the document is marked `status = 'duplicate'` (orange badge in the admin UI) and its chunks are de-indexed.
+- **Sync-time dedup:** `SyncKnowledgeSource` filters filesystem scans against known content hashes before inserting new records.
+- **Result filtering:** The `SemanticProvider` cross-references document IDs against the database, excluding any document whose status is not `indexed` from search results.
+
+#### Configurable Synonym Expansion
+Query-time synonym expansion rewrites search terms using administrator-defined synonym groups before sending the query to Typesense:
+
+- **Synonym Groups:** Defined via the **Admin → Synonyms** page. Each group is a set of equivalent terms (e.g., `["car", "automobile", "vehicle"]`).
+- **Query Rewriting:** The `QueryRewriter` tokenizes the query and expands matching words into Typesense `OR` groups. For example, `"fast car"` becomes `"fast (car OR automobile OR vehicle)"`.
+- **Toggleable:** Controlled by the `knowledge.synonym_expansion_enabled` setting in **Settings → Search Config**. Disabling stops all expansion — no reindexing needed.
+- **Multi-word phrases:** Quoted phrases in synonym groups are preserved (e.g., `"machine learning"`).
+
+#### Recency-Aware Reciprocal Rank Fusion
+The RRF fusion strategy was extended with an optional recency boost that gives fresher content a scoring advantage:
+
+- **Exponential Decay Formula:** `final_score = rrf_score × (1 + boostFactor × e^(-λ × days_since_indexed))` where `λ = ln(2) / halfLifeDays`.
+- **Configurable parameters:** `knowledge.recency_boost_enabled` (toggle), `knowledge.recency_boost_factor` (0.0–1.0, default 0.3), and `knowledge.recency_boost_half_life_days` (1–365, default 30). Managed from **Settings → Search Config**.
+- **Neutral for old content:** Items without timestamps or very old content get a multiplier of ~1.0 — they are never penalized, just not boosted.
+- **Timestamp source:** The `SemanticProvider` maps Typesense's auto-added `created_at` field into the result item's `indexed_at` for recency scoring. Items from federation providers without timestamps receive neutral treatment.
+- **Backward compatible:** The `RecencyBoostConfig` parameter on `ResultFusionStrategy::fuse()` is nullable — passing `null` preserves the original RRF behavior unchanged.
+
 ### Web Provider & Crawling
 The `WebProvider` fetches and converts content from configured URLs into searchable Markdown via `league/html-to-markdown`. For larger documentation sites, it supports **recursive crawling**:
 
@@ -224,6 +260,10 @@ The `WebProvider` fetches and converts content from configured URLs into searcha
 - **Notification Pipeline:** Email and webhook alerts for high search latency, sync failures, and federation errors — configurable thresholds, alert types, and cooldown windows.
 - **Scheduler Maintenance:** Automated Horizon metric snapshots, federation capability sync, and retrieval log pruning via Laravel's scheduler.
 - **Horizon Queues:** Background indexing and document processing via Redis queues.
+- **Hybrid Search:** Combined keyword+vector search in Typesense with configurable alpha weighting — balances precision and semantic recall in a single query.
+- **Content Deduplication:** SHA-256 hashing at upload, parse, and sync stages prevents duplicate content from entering the index — duplicates are flagged and their chunks de-indexed.
+- **Synonym Expansion:** Configurable synonym groups expand queries at search time (e.g., "car" → "car OR automobile OR vehicle") — toggleable per deployment with no reindexing.
+- **Recency-aware Ranking:** Exponential-decay recency boost in RRF fusion — fresh content surfaces higher (configurable boost factor and half-life).
 - **Apache Tika Integration:** Robust parsing for hundreds of document formats (PDF, DOCX, etc.).
 - **Passkeys + 2FA:** Fortify-powered authentication with passkeys and TOTP two-factor auth.
 - **Role-based Access:** Admin, Operator, and Viewer roles for UI authorization.
@@ -286,6 +326,11 @@ vendor/bin/sail npm install
 vendor/bin/sail artisan key:generate
 vendor/bin/sail artisan migrate --seed
 
+# Index demo data and build the metadata registry
+vendor/bin/sail artisan knowledge:chunks:index
+vendor/bin/sail artisan knowledge:providers:sync
+vendor/bin/sail artisan knowledge:registry:refresh
+
 # Build frontend assets
 vendor/bin/sail npm run build
 
@@ -308,9 +353,15 @@ Note: some tests that exercise the vector store (Typesense) or Horizon will need
 
 ### Default Admin User
 
-After seeding, log in with:
-- **Email:** `admin@agentoom.com`
-- **Password:** `changeme`
+The seeder creates an admin user. By default the email is `admin@agentoom.com` and a **random password is generated** and printed to the console during seeding (also written to `storage/app/initial-admin-password.txt`).
+
+To use a fixed password instead (e.g., for automated evaluation environments), set both `ADMIN_EMAIL` and `ADMIN_PASSWORD` in your `.env` file before seeding.
+
+```bash
+# Example: override with known credentials
+ADMIN_EMAIL=ci@example.com
+ADMIN_PASSWORD=my-secure-password
+```
 
 The seeder is idempotent — you can safely re-run `migrate --seed` without duplicate key errors.
 
@@ -334,7 +385,7 @@ vendor/bin/sail artisan horizon
 - **Phase 4:** Advanced chunking strategies, HTML-to-Markdown conversion, provider SDK formalization. ✅
 - **Phase 5:** True web crawling (domain recursive), MCP federation. ✅
 - **Phase 6:** Production hardening — Laravel scheduler for periodic maintenance (Horizon snapshots, federation sync, log pruning), rate limiting on the MCP API endpoint, health-check endpoint for Docker and load balancers, notification pipeline for sync failures and high-latency alerts. ✅
-- **Phase 7:** Search quality — hybrid keyword+vector search in Typesense, content deduplication via SHA-256 hashing in the parse stage, configurable synonym expansion for query rewriting, recency-aware scoring in Reciprocal Rank Fusion so fresher content surfaces higher.
+- **Phase 7:** Search quality — hybrid keyword+vector search in Typesense, content deduplication via SHA-256 hashing in the parse stage, configurable synonym expansion for query rewriting, recency-aware scoring in Reciprocal Rank Fusion so fresher content surfaces higher. ✅
 - **Phase 8:** Provider completeness — external embedding provider implementation (OpenAI, Cohere, local HuggingFace) through the existing `EmbeddingProvider` contract, MCP resources for document and source browsing, **OCR fallback for images**: a local OCR engine (e.g., PaddleOCR) running in the same Docker stack that the pipeline calls only when Tika returns empty or near-empty content from image files (jpg, png, tiff, etc.), so image-based documents become searchable without external API dependencies. Non-image parsing stays on Tika; OCR is a targeted gap-filler, not a replacement.
 - **Phase 9:** Enterprise features — activity/audit trail tracking who changed what (sources, API keys, settings), token-aware chunking that respects LLM context windows, retry/reprocess mechanism for documents stuck in `error` status after transient Tika failures, knowledge source templates for one-click setup of common configurations.
 - **Phase 10:** Test coverage — dedicated tests for each provider (Yaml, Json, Markdown, Web, Sql), chunking strategy tests for all four strategies, Livewire component tests for Playground, ApiKeys, DangerZone, and Dashboard.

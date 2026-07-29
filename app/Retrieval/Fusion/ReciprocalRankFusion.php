@@ -3,14 +3,18 @@
 namespace App\Retrieval\Fusion;
 
 use App\Contracts\ResultFusionStrategy;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class ReciprocalRankFusion implements ResultFusionStrategy
 {
-    public function fuse(array $results): array
+    public function fuse(array $results, ?RecencyBoostConfig $recencyConfig = null): array
     {
         $scores = [];
         $lookup = [];
+
+        $now = now();
 
         // Single pass: compute RRF scores and build key→item lookup map.
         // First occurrence wins primary fields; subsequent occurrences merge metadata.
@@ -47,6 +51,15 @@ class ReciprocalRankFusion implements ResultFusionStrategy
             }
         }
 
+        // Apply recency boost to each item's score before sorting.
+        if ($recencyConfig !== null && $recencyConfig->isEnabled()) {
+            foreach ($scores as $key => $score) {
+                $daysSinceIndexed = $this->resolveDaysSinceIndexed($lookup[$key], $now);
+                $multiplier = $recencyConfig->computeMultiplier($daysSinceIndexed);
+                $scores[$key] = $score * $multiplier;
+            }
+        }
+
         arsort($scores);
 
         $fused = [];
@@ -56,6 +69,35 @@ class ReciprocalRankFusion implements ResultFusionStrategy
         }
 
         return $fused;
+    }
+
+    /**
+     * Extract the age of an item in days from its indexed_at or _timestamp field.
+     *
+     * Returns PHP_FLOAT_MAX for items without a timestamp so they get
+     * a multiplier of effectively 1.0 (neutral).
+     */
+    private function resolveDaysSinceIndexed(array $item, CarbonInterface $now): float
+    {
+        $timestamp = $item['indexed_at'] ?? $item['_timestamp'] ?? null;
+
+        if ($timestamp === null) {
+            return PHP_FLOAT_MAX;
+        }
+
+        try {
+            if (is_numeric($timestamp)) {
+                $indexedAt = Carbon::createFromTimestamp((int) $timestamp);
+            } else {
+                $indexedAt = Carbon::parse($timestamp);
+            }
+
+            $days = abs($indexedAt->diffInDays($now));
+
+            return (float) $days;
+        } catch (\Throwable) {
+            return PHP_FLOAT_MAX;
+        }
     }
 
     /**

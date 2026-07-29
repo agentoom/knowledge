@@ -21,6 +21,11 @@ class ChunkDocument implements ShouldQueue
     {
         $document = Document::findOrFail($this->documentId);
 
+        // Skip documents that are not in a state ready for chunking.
+        if (! in_array($document->status, ['parsed', 'discovered'], true)) {
+            return;
+        }
+
         $content = $document->content ?? '';
 
         if ($content === '' || $content === '0') {

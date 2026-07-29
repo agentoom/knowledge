@@ -45,6 +45,9 @@
                     <flux:sidebar.item icon="cog" :href="route('admin.settings')" :current="request()->routeIs('admin.settings')" wire:navigate>
                         Settings
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="puzzle-piece" :href="route('admin.synonyms.index')" :current="request()->routeIs('admin.synonyms.*')" wire:navigate>
+                        Synonyms
+                    </flux:sidebar.item>
                     <flux:sidebar.item icon="queue-list" :href="route('admin.jobs.index')" :current="request()->routeIs('admin.jobs.*')" wire:navigate>
                         Jobs
                     </flux:sidebar.item>

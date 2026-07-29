@@ -23,6 +23,19 @@ class Index extends Component
 
     public int $chunkOverlap = 200;
 
+    // Hybrid search settings
+    public float $hybridAlpha = 0.5;
+
+    // Recency boost settings
+    public bool $recencyBoostEnabled = false;
+
+    public float $recencyBoostFactor = 0.3;
+
+    public float $recencyBoostHalfLifeDays = 30.0;
+
+    // Synonym expansion settings
+    public bool $synonymExpansionEnabled = false;
+
     /**
      * @var array<string, string>
      */
@@ -62,6 +75,11 @@ class Index extends Component
             'knowledge.default_chunking_strategy',
             'knowledge.chunk_size',
             'knowledge.chunk_overlap',
+            'knowledge.hybrid_alpha',
+            'knowledge.recency_boost_enabled',
+            'knowledge.recency_boost_factor',
+            'knowledge.recency_boost_half_life_days',
+            'knowledge.synonym_expansion_enabled',
         ], [
             'knowledge.default_planner_strategy' => 'federation',
             'knowledge.default_fusion_strategy' => 'reciprocal_rank_fusion',
@@ -69,6 +87,11 @@ class Index extends Component
             'knowledge.default_chunking_strategy' => 'fixed_size',
             'knowledge.chunk_size' => 1000,
             'knowledge.chunk_overlap' => 200,
+            'knowledge.hybrid_alpha' => 0.5,
+            'knowledge.recency_boost_enabled' => false,
+            'knowledge.recency_boost_factor' => 0.3,
+            'knowledge.recency_boost_half_life_days' => 30.0,
+            'knowledge.synonym_expansion_enabled' => false,
         ]);
 
         $this->defaultPlannerStrategy = $settings['knowledge.default_planner_strategy'];
@@ -77,6 +100,17 @@ class Index extends Component
         $this->defaultChunkingStrategy = $settings['knowledge.default_chunking_strategy'];
         $this->chunkSize = (int) $settings['knowledge.chunk_size'];
         $this->chunkOverlap = (int) $settings['knowledge.chunk_overlap'];
+
+        // Hybrid search
+        $this->hybridAlpha = (float) $settings['knowledge.hybrid_alpha'];
+
+        // Recency boost
+        $this->recencyBoostEnabled = (bool) $settings['knowledge.recency_boost_enabled'];
+        $this->recencyBoostFactor = (float) $settings['knowledge.recency_boost_factor'];
+        $this->recencyBoostHalfLifeDays = (float) $settings['knowledge.recency_boost_half_life_days'];
+
+        // Synonym expansion
+        $this->synonymExpansionEnabled = (bool) $settings['knowledge.synonym_expansion_enabled'];
 
         $this->availablePlannerStrategies = [
             'default' => 'Default (Rule-based)',
@@ -122,6 +156,9 @@ class Index extends Component
             'defaultMaxResults' => ['required', 'integer', 'min:1', 'max:100'],
             'chunkSize' => ['required', 'integer', 'min:100', 'max:10000'],
             'chunkOverlap' => ['required', 'integer', 'min:0', 'max:1000'],
+            'hybridAlpha' => ['required', 'numeric', 'min:0', 'max:1'],
+            'recencyBoostFactor' => ['required', 'numeric', 'min:0', 'max:1'],
+            'recencyBoostHalfLifeDays' => ['required', 'numeric', 'min:1', 'max:365'],
         ]);
 
         Settings::set('knowledge.default_planner_strategy', $this->defaultPlannerStrategy, 'string');
@@ -130,6 +167,11 @@ class Index extends Component
         Settings::set('knowledge.default_chunking_strategy', $this->defaultChunkingStrategy, 'string');
         Settings::set('knowledge.chunk_size', $this->chunkSize, 'integer');
         Settings::set('knowledge.chunk_overlap', $this->chunkOverlap, 'integer');
+        Settings::set('knowledge.hybrid_alpha', $this->hybridAlpha, 'float');
+        Settings::set('knowledge.recency_boost_enabled', $this->recencyBoostEnabled, 'boolean');
+        Settings::set('knowledge.recency_boost_factor', $this->recencyBoostFactor, 'float');
+        Settings::set('knowledge.recency_boost_half_life_days', $this->recencyBoostHalfLifeDays, 'float');
+        Settings::set('knowledge.synonym_expansion_enabled', $this->synonymExpansionEnabled, 'boolean');
 
         $this->dispatch('notify', message: 'Search configuration saved successfully.');
         $this->dispatch('settings-clean');

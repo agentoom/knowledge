@@ -13,7 +13,7 @@
                 <div>
                     <span class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Status</span>
                     <p>
-                        <flux:badge color="{{ $status === 'indexed' ? 'green' : ($status === 'error' ? 'red' : 'gray') }}">
+                        <flux:badge color="{{ match($status) { 'indexed' => 'green', 'parsed', 'chunked' => 'blue', 'discovered' => 'yellow', 'duplicate' => 'orange', 'error' => 'red', default => 'gray' } }}">
                             {{ $status }}
                         </flux:badge>
                     </p>

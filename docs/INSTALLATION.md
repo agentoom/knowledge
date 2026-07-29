@@ -37,11 +37,14 @@ The entrypoint handles everything automatically:
 - Builds the metadata registry
 - Caches routes and config for production
 
-That's it. Open `http://your-domain.com` and log in with:
+That's it. Open `http://your-domain.com` and log in with the credentials printed to the Docker logs during startup (also available in the `knowledge` container at `/var/www/html/storage/app/initial-admin-password.txt`).
 
-| Email | Password |
-|-------|----------|
-| `knowledge@agentoom.com` | `changeme` |
+To use a fixed password instead, set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in your `.env` before starting:
+
+```bash
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=your-secure-password
+```
 
 > ⚠️ **Change the password immediately** after logging in. Navigate to **Search Playground** and search for anything — results from all 4 providers are ready.
 

@@ -7,10 +7,12 @@ use App\Contracts\ResultFusionStrategy;
 use App\Events\RetrievalExecuted;
 use App\Knowledge\Services\ProviderManager;
 use App\Models\RetrievalLog;
+use App\Retrieval\Fusion\RecencyBoostConfig;
 use App\Retrieval\Models\ExecutionPlan;
 use App\Retrieval\Models\PlanStep;
 use App\Retrieval\Models\SearchQuery;
 use App\Retrieval\Models\SearchResult;
+use App\Settings\Facades\Settings;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Support\Facades\Concurrency;
 use Illuminate\Support\Facades\Http;
@@ -42,7 +44,7 @@ class RetrievalEngine
             $results = array_merge($results, $this->executeLocalSteps($localSteps));
         }
 
-        $fused = $this->fusion->fuse($results);
+        $fused = $this->fusion->fuse($results, $this->buildRecencyConfig());
 
         $latency = (int) ((microtime(true) - $start) * 1000);
 
@@ -65,6 +67,20 @@ class RetrievalEngine
     /**
      * @param  array<int, mixed>  $fusedResults
      */
+    private function buildRecencyConfig(): ?RecencyBoostConfig
+    {
+        $enabled = (bool) Settings::get('knowledge.recency_boost_enabled', false);
+
+        if (! $enabled) {
+            return null;
+        }
+
+        return new RecencyBoostConfig(
+            boostFactor: (float) Settings::get('knowledge.recency_boost_factor', 0.3),
+            halfLifeDays: (float) Settings::get('knowledge.recency_boost_half_life_days', 30.0),
+        );
+    }
+
     private function logRetrieval(ExecutionPlan $plan, array $fusedResults, int $latency): void
     {
         try {

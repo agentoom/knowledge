@@ -11,6 +11,8 @@ use App\Federation\FederationManager;
 use App\Planning\Strategies\DefaultPlanner;
 use App\Planning\Strategies\FederationPlanner;
 use App\Retrieval\Fusion\ReciprocalRankFusion;
+use App\Retrieval\Services\QueryRewriter;
+use App\Retrieval\Services\SynonymService;
 use App\Settings\Facades\Settings;
 use App\Settings\SettingsManager;
 use Illuminate\Support\ServiceProvider;
@@ -44,6 +46,8 @@ class KnowledgeServiceProvider extends ServiceProvider
 
         $this->app->singleton(ChunkingStrategyRegistry::class);
         $this->app->singleton(FederationManager::class);
+        $this->app->singleton(SynonymService::class);
+        $this->app->singleton(QueryRewriter::class);
     }
 
     public function boot(): void {}

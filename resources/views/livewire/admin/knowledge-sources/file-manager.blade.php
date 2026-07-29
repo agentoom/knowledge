@@ -41,9 +41,13 @@
                         &middot;
                         <span class="text-red-600 dark:text-red-400">{{ $this->stats['error'] }} error{{ $this->stats['error'] !== 1 ? 's' : '' }}</span>
                     @endif
-                    @if ($this->stats['discovered'] > 0)
+                    @if ($this->stats['duplicate'] > 0)
                         &middot;
-                        <span class="text-amber-600 dark:text-amber-400">{{ $this->stats['discovered'] }} pending</span>
+                        <span class="text-orange-600 dark:text-orange-400">{{ $this->stats['duplicate'] }} duplicate{{ $this->stats['duplicate'] !== 1 ? 's' : '' }}</span>
+                    @endif
+                    @if ($this->stats['pending'] > 0)
+                        &middot;
+                        <span class="text-amber-600 dark:text-amber-400">{{ $this->stats['pending'] }} pending</span>
                     @endif
                 </p>
             </div>
@@ -194,6 +198,7 @@
                     'all' => 'All',
                     'indexed' => 'Indexed',
                     'discovered' => 'Pending',
+                    'duplicate' => 'Duplicate',
                     'error' => 'Errors',
                     'chunked' => 'Chunked',
                 ] as $value => $label)
@@ -294,6 +299,8 @@
                                         <flux:badge size="sm" color="green" icon="check-circle">Indexed</flux:badge>
                                     @elseif ($status === 'error')
                                         <flux:badge size="sm" color="red" icon="exclamation-circle">Error</flux:badge>
+                                    @elseif ($status === 'duplicate')
+                                        <flux:badge size="sm" color="orange" icon="document-duplicate">Duplicate</flux:badge>
                                     @elseif (in_array($status, ['discovered', 'parsed', 'chunked']))
                                         <flux:badge size="sm" color="amber" icon="clock">{{ ucfirst($status) }}</flux:badge>
                                     @else

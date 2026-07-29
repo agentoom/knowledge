@@ -36,8 +36,16 @@ class TikaParser implements DocumentParser
 
         $data = $response->json();
 
+        $content = $data['X-TIKA:content'] ?? $response->body();
+
+        // Tika may return HTML-wrapped content even with Accept: application/json.
+        // Strip HTML tags and decode entities to get clean plain text.
+        $content = strip_tags($content);
+        $content = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $content = trim($content);
+
         return [
-            'content' => $data['X-TIKA:content'] ?? $response->body(),
+            'content' => $content,
             'metadata' => $data,
         ];
     }

@@ -44,6 +44,7 @@
                     <option value="parsed">Parsed</option>
                     <option value="discovered">Discovered</option>
                     <option value="error">Error</option>
+                    <option value="duplicate">Duplicate</option>
                 </flux:select>
             </flux:field>
         </div>
@@ -85,6 +86,7 @@
                             'chunked', 'parsed' => 'blue',
                             'discovered' => 'yellow',
                             'error' => 'red',
+                            'duplicate' => 'orange',
                             default => 'gray',
                         }">
                             {{ $document->status }}

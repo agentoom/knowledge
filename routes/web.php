@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\ResolveAdminCredentials;
 use App\Enums\Role;
 use App\Http\Controllers\HealthController;
 use App\Livewire\Admin\Chunks\Index as ChunksIndex;
@@ -9,6 +10,7 @@ use App\Livewire\Admin\Documents\Show as DocumentsShow;
 use App\Livewire\Admin\Federation\Servers as FederationServers;
 use App\Livewire\Admin\Health\Dashboard as HealthDashboard;
 use App\Livewire\Admin\Jobs\Index as JobsIndex;
+use App\Livewire\Admin\KnowledgeSources\Create;
 use App\Livewire\Admin\KnowledgeSources\Index as KnowledgeSourcesIndex;
 use App\Livewire\Admin\KnowledgeSources\Show as KnowledgeSourcesShow;
 use App\Livewire\Admin\Mcp\ApiKeys as McpApiKeys;
@@ -18,6 +20,7 @@ use App\Livewire\Admin\Providers\Index as ProvidersIndex;
 use App\Livewire\Admin\RetrievalLogs\Index as RetrievalLogsIndex;
 use App\Livewire\Admin\Search\Playground as SearchPlayground;
 use App\Livewire\Admin\Settings\Index as SettingsIndex;
+use App\Livewire\Admin\Synonyms\Index as SynonymsIndex;
 use App\Livewire\Admin\Users\Index as UsersIndex;
 use App\Livewire\Admin\Users\Roles as UsersRoles;
 use App\Models\User;
@@ -36,14 +39,23 @@ Route::get('install', function () {
         return response('Application already installed. A superadmin user already exists.', 403);
     }
 
+    $credentials = ResolveAdminCredentials::resolve();
+
     User::create([
         'name' => 'Super Admin',
-        'email' => 'knowledge@agentoom.com',
-        'password' => 'changeme',
+        'email' => $credentials['email'],
+        'password' => $credentials['password'],
         'role' => Role::Admin,
     ]);
 
-    return response('Installation complete. Superadmin user created with email knowledge@agentoom.com. Please change the password immediately.', 200);
+    $passwordNote = $credentials['wasGenerated']
+        ? ' (password saved to storage/app/initial-admin-password.txt)'
+        : '';
+
+    return response(
+        "Installation complete. Superadmin user created with email {$credentials['email']}{$passwordNote}. Please change the password immediately.",
+        200
+    );
 })->name('install');
 
 Route::get('dashboard', function () {
@@ -79,6 +91,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::livewire('users/roles', UsersRoles::class)->name('users.roles');
 
         Route::livewire('settings', SettingsIndex::class)->name('settings');
+
+        Route::livewire('synonyms', SynonymsIndex::class)->name('synonyms.index');
 
         Route::livewire('federation/servers', FederationServers::class)->name('federation.servers');
 

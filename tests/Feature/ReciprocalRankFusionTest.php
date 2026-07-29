@@ -1,5 +1,6 @@
 <?php
 
+use App\Retrieval\Fusion\RecencyBoostConfig;
 use App\Retrieval\Fusion\ReciprocalRankFusion;
 use App\Retrieval\Models\SearchResult;
 
@@ -255,4 +256,118 @@ test('deduplication preserves first occurrence for scalar fields (unchanged)', f
     expect($fused)->toHaveCount(1)
         ->and($fused[0]['title'])->toBe('First Occurrence')
         ->and($fused[0]['score'])->toBe(10);
+});
+
+// --- Recency Boost Tests ---
+
+test('boosts newer items higher with recency config', function () {
+    $fusion = new ReciprocalRankFusion;
+    $recencyConfig = new RecencyBoostConfig(boostFactor: 0.5, halfLifeDays: 30.0);
+
+    $now = time();
+    $oneWeekAgo = $now - (7 * 86400);
+
+    // Both items at same rank position but different ages — newer should rank higher
+    $result = new SearchResult(
+        items: [
+            ['id' => 'old', 'title' => 'Old Doc', 'indexed_at' => $oneWeekAgo],
+            ['id' => 'new', 'title' => 'New Doc', 'indexed_at' => $now],
+        ],
+        totalCount: 2,
+        providerName: 'test',
+    );
+
+    $fused = $fusion->fuse([$result], $recencyConfig);
+
+    expect($fused)->toHaveCount(2)
+        ->and($fused[0]['id'])->toBe('new'); // newer ranks higher even though 'old' was first
+});
+
+test('item without timestamp gets neutral boost', function () {
+    $fusion = new ReciprocalRankFusion;
+    $recencyConfig = new RecencyBoostConfig(boostFactor: 0.5, halfLifeDays: 30.0);
+
+    $now = time();
+
+    $result = new SearchResult(
+        items: [
+            ['id' => 'no_ts', 'title' => 'No Timestamp'],
+            ['id' => 'with_ts', 'title' => 'With Timestamp', 'indexed_at' => $now],
+        ],
+        totalCount: 2,
+        providerName: 'test',
+    );
+
+    $fused = $fusion->fuse([$result], $recencyConfig);
+
+    // Item with timestamp (newer, gets boost) should rank higher than item without
+    expect($fused)->toHaveCount(2)
+        ->and($fused[0]['id'])->toBe('with_ts');
+});
+
+test('disabled recency boost preserves original ordering', function () {
+    $fusion = new ReciprocalRankFusion;
+    $recencyConfig = new RecencyBoostConfig(boostFactor: 0.0, halfLifeDays: 30.0);
+
+    $now = time();
+    $oneMonthAgo = $now - (30 * 86400);
+
+    $result = new SearchResult(
+        items: [
+            ['id' => 'first', 'title' => 'First', 'indexed_at' => $oneMonthAgo],
+            ['id' => 'second', 'title' => 'Second', 'indexed_at' => $now],
+        ],
+        totalCount: 2,
+        providerName: 'test',
+    );
+
+    $fused = $fusion->fuse([$result], $recencyConfig);
+
+    // With boostFactor=0, original ordering by rank should be preserved
+    expect($fused)->toHaveCount(2)
+        ->and($fused[0]['id'])->toBe('first');
+});
+
+test('null recency config preserves original behavior', function () {
+    $fusion = new ReciprocalRankFusion;
+
+    $now = time();
+    $oneWeekAgo = $now - (7 * 86400);
+
+    $result = new SearchResult(
+        items: [
+            ['id' => 'old_rank0', 'title' => 'Old higher rank', 'indexed_at' => $oneWeekAgo],
+            ['id' => 'new_rank1', 'title' => 'New lower rank', 'indexed_at' => $now],
+        ],
+        totalCount: 2,
+        providerName: 'test',
+    );
+
+    $fused = $fusion->fuse([$result], null);
+
+    // Without recency config, original RRF ordering by rank
+    expect($fused)->toHaveCount(2)
+        ->and($fused[0]['id'])->toBe('old_rank0');
+});
+
+test('handles _timestamp field as fallback for indexed_at', function () {
+    $fusion = new ReciprocalRankFusion;
+    $recencyConfig = new RecencyBoostConfig(boostFactor: 0.5, halfLifeDays: 30.0);
+
+    $now = time();
+    $old = $now - (90 * 86400);
+
+    $result = new SearchResult(
+        items: [
+            ['id' => 'a', 'title' => 'Uses _timestamp', '_timestamp' => $now],
+            ['id' => 'b', 'title' => 'Older', '_timestamp' => $old],
+        ],
+        totalCount: 2,
+        providerName: 'test',
+    );
+
+    $fused = $fusion->fuse([$result], $recencyConfig);
+
+    expect($fused)->toHaveCount(2)
+        ->and($fused[0]['id'])->toBe('a');
 });

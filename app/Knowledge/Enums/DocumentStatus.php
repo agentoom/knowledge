@@ -9,4 +9,5 @@ enum DocumentStatus: string
     case Chunked = 'chunked';
     case Indexed = 'indexed';
     case Error = 'error';
+    case Duplicate = 'duplicate';
 }

@@ -104,7 +104,7 @@
                             </div>
                             
                             <div class="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed line-clamp-4">
-                                {{ $item['content'] }}
+                                {{ $item['content'] ?? 'No content available' }}
                             </div>
 
                             <div class="mt-4 flex flex-wrap gap-2 items-center">

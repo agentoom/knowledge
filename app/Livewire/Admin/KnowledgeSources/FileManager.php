@@ -247,7 +247,52 @@ class FileManager extends Component
             $this->uploadProgress = (int) (($index + 1) / count($this->uploadingFiles) * 100);
         }
 
-        // Batch-insert all Document records at once.
+        // Check for duplicate content hashes before inserting.
+        // Merge duplicates from the current batch AND from the database.
+        $seenHashes = [];
+
+        $dbHashes = Document::whereNotNull('content_hash')
+            ->whereNotIn('status', ['stale', 'duplicate', 'error'])
+            ->pluck('content_hash')
+            ->unique()
+            ->toArray();
+
+        $duplicateCount = 0;
+        $records = array_values(array_filter($records, function (array $record) use (&$seenHashes, $dbHashes, &$duplicateCount): bool {
+            $hash = $record['content_hash'] ?? '';
+
+            if ($hash === '' || $hash === '0') {
+                return true;
+            }
+
+            // Check against records already in this batch.
+            if (isset($seenHashes[$hash])) {
+                $duplicateCount++;
+
+                if (isset($record['path']) && file_exists($record['path'])) {
+                    @unlink($record['path']);
+                }
+
+                return false;
+            }
+
+            // Check against records already in the database.
+            if (in_array($hash, $dbHashes, true)) {
+                $duplicateCount++;
+
+                if (isset($record['path']) && file_exists($record['path'])) {
+                    @unlink($record['path']);
+                }
+
+                return false;
+            }
+
+            $seenHashes[$hash] = true;
+
+            return true;
+        }));
+
+        // Batch-insert all unique Document records at once.
         if (! empty($records)) {
             $source->documents()->createMany($records);
         }
@@ -264,7 +309,15 @@ class FileManager extends Component
         // for the newly-uploaded documents.
         if ($uploaded > 0) {
             app(PipelineOrchestrator::class)->run($source);
-            $this->statusMessage = $uploaded.' file(s) uploaded. Indexing started...';
+
+            $message = $uploaded.' file(s) uploaded.';
+
+            if ($duplicateCount > 0) {
+                $message .= " {$duplicateCount} duplicate(s) skipped.";
+            }
+
+            $message .= ' Indexing started...';
+            $this->statusMessage = $message;
         }
 
         if (! empty($errorMessages)) {
@@ -324,14 +377,14 @@ class FileManager extends Component
     }
 
     /**
-     * @return array{total: int, indexed: int, error: int, discovered: int}
+     * @return array{total: int, indexed: int, error: int, duplicate: int, pending: int}
      */
     public function getStatsProperty(): array
     {
         $source = KnowledgeSource::find($this->sourceId);
 
         if (! $source) {
-            return ['total' => 0, 'indexed' => 0, 'error' => 0, 'discovered' => 0];
+            return ['total' => 0, 'indexed' => 0, 'error' => 0, 'duplicate' => 0, 'pending' => 0];
         }
 
         $query = $source->documents()->where('status', '!=', 'stale');
@@ -339,9 +392,10 @@ class FileManager extends Component
         $total = (clone $query)->count();
         $indexed = (clone $query)->where('status', 'indexed')->count();
         $error = (clone $query)->where('status', 'error')->count();
-        $discovered = (clone $query)->whereNotIn('status', ['indexed', 'error'])->count();
+        $duplicate = (clone $query)->where('status', 'duplicate')->count();
+        $pending = (clone $query)->whereNotIn('status', ['indexed', 'error', 'duplicate'])->count();
 
-        return compact('total', 'indexed', 'error', 'discovered');
+        return compact('total', 'indexed', 'error', 'duplicate', 'pending');
     }
 
     /**

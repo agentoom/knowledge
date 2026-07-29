@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands\Knowledge;
 
+use App\Actions\ResolveAdminCredentials;
 use App\Enums\Role;
 use App\Models\User;
 use Illuminate\Console\Command;
@@ -14,7 +15,9 @@ class InstallSuperadmin extends Command
 
     public function handle(): int
     {
-        if (User::where('email', 'knowledge@agentoom.com')->exists()) {
+        $credentials = ResolveAdminCredentials::resolve();
+
+        if (User::where('email', $credentials['email'])->exists()) {
             $this->info('Superadmin user already exists.');
 
             return self::SUCCESS;
@@ -22,15 +25,18 @@ class InstallSuperadmin extends Command
 
         User::create([
             'name' => 'Super Admin',
-            'email' => 'knowledge@agentoom.com',
-            'password' => 'changeme',
+            'email' => $credentials['email'],
+            'password' => $credentials['password'],
             'role' => Role::Admin,
         ]);
 
         $this->info('Superadmin user created successfully.');
-        $this->warn('Email: knowledge@agentoom.com');
-        $this->warn('Password: changeme');
-        $this->warn('Please change the password immediately.');
+        ResolveAdminCredentials::outputToConsole(
+            $this,
+            $credentials['email'],
+            $credentials['password'],
+            $credentials['wasGenerated']
+        );
 
         return self::SUCCESS;
     }

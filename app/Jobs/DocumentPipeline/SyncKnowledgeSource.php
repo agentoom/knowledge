@@ -4,6 +4,7 @@ namespace App\Jobs\DocumentPipeline;
 
 use App\DocumentPipeline\Services\PipelineOrchestrator;
 use App\Knowledge\Enums\ProviderType;
+use App\Knowledge\Models\Document;
 use App\Knowledge\Models\KnowledgeSource;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -53,6 +54,15 @@ class SyncKnowledgeSource implements ShouldQueue
         $allowedExtensions = $type->allowedExtensions();
 
         $existingPaths = $source->documents()->pluck('path')->toArray();
+
+        // Load all known content hashes from non-stale, non-duplicate documents
+        // across the entire system to prevent duplicate content from entering the pipeline.
+        $knownHashes = Document::whereNotNull('content_hash')
+            ->whereNotIn('status', ['stale', 'duplicate', 'error'])
+            ->pluck('content_hash')
+            ->unique()
+            ->toArray();
+
         $seenPaths = [];
         $records = [];
 
@@ -99,6 +109,26 @@ class SyncKnowledgeSource implements ShouldQueue
                 'updated_at' => now(),
             ];
         }
+
+        // Filter out files whose content hash already exists in the system.
+        $records = array_values(array_filter($records, function (array $record) use ($knownHashes): bool {
+            $hash = $record['content_hash'] ?? '';
+
+            if ($hash === '' || $hash === '0') {
+                return true; // No hash available — allow through for parsing to compute one.
+            }
+
+            if (in_array($hash, $knownHashes, true)) {
+                Log::info('SyncKnowledgeSource: skipping duplicate file (content hash already exists).', [
+                    'path' => $record['path'],
+                    'content_hash' => $hash,
+                ]);
+
+                return false;
+            }
+
+            return true;
+        }));
 
         if (! empty($records)) {
             $source->documents()->insert($records);
