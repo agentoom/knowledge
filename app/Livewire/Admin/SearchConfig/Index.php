@@ -36,6 +36,8 @@ class Index extends Component
     // Synonym expansion settings
     public bool $synonymExpansionEnabled = false;
 
+    public int $synonymExpansionMaxTerms = 10;
+
     /**
      * @var array<string, string>
      */
@@ -80,6 +82,7 @@ class Index extends Component
             'knowledge.recency_boost_factor',
             'knowledge.recency_boost_half_life_days',
             'knowledge.synonym_expansion_enabled',
+            'knowledge.synonym_expansion_max_terms',
         ], [
             'knowledge.default_planner_strategy' => 'federation',
             'knowledge.default_fusion_strategy' => 'reciprocal_rank_fusion',
@@ -92,6 +95,7 @@ class Index extends Component
             'knowledge.recency_boost_factor' => 0.3,
             'knowledge.recency_boost_half_life_days' => 30.0,
             'knowledge.synonym_expansion_enabled' => false,
+            'knowledge.synonym_expansion_max_terms' => 10,
         ]);
 
         $this->defaultPlannerStrategy = $settings['knowledge.default_planner_strategy'];
@@ -111,6 +115,7 @@ class Index extends Component
 
         // Synonym expansion
         $this->synonymExpansionEnabled = (bool) $settings['knowledge.synonym_expansion_enabled'];
+        $this->synonymExpansionMaxTerms = (int) $settings['knowledge.synonym_expansion_max_terms'];
 
         $this->availablePlannerStrategies = [
             'default' => 'Default (Rule-based)',
@@ -159,6 +164,7 @@ class Index extends Component
             'hybridAlpha' => ['required', 'numeric', 'min:0', 'max:1'],
             'recencyBoostFactor' => ['required', 'numeric', 'min:0', 'max:1'],
             'recencyBoostHalfLifeDays' => ['required', 'numeric', 'min:1', 'max:365'],
+            'synonymExpansionMaxTerms' => ['required', 'integer', 'min:2', 'max:100'],
         ]);
 
         Settings::set('knowledge.default_planner_strategy', $this->defaultPlannerStrategy, 'string');
@@ -172,6 +178,7 @@ class Index extends Component
         Settings::set('knowledge.recency_boost_factor', $this->recencyBoostFactor, 'float');
         Settings::set('knowledge.recency_boost_half_life_days', $this->recencyBoostHalfLifeDays, 'float');
         Settings::set('knowledge.synonym_expansion_enabled', $this->synonymExpansionEnabled, 'boolean');
+        Settings::set('knowledge.synonym_expansion_max_terms', $this->synonymExpansionMaxTerms, 'integer');
 
         $this->dispatch('notify', message: 'Search configuration saved successfully.');
         $this->dispatch('settings-clean');

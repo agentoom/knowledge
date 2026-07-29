@@ -106,13 +106,24 @@
             <div class="space-y-6">
                 <flux:field>
                     <div class="flex items-center gap-3">
-                        <flux:switch wire:model="synonymExpansionEnabled" />
+                        <flux:switch wire:model.live="synonymExpansionEnabled" />
                         <flux:label>Enable Synonym Expansion</flux:label>
                     </div>
                     <flux:description>
                         When enabled, search queries are automatically expanded using configured synonym groups. For example, a query for "car" would also match "automobile", "vehicle", etc.
                     </flux:description>
                 </flux:field>
+
+                @if ($synonymExpansionEnabled)
+                    <flux:field>
+                        <flux:label>Max Expansion Terms per Token</flux:label>
+                        <flux:input type="number" wire:model="synonymExpansionMaxTerms" min="2" max="100" />
+                        <flux:error name="synonymExpansionMaxTerms" />
+                        <flux:description>
+                            Caps how many synonym variants are OR'd into a single query token (2–100, default 10). Prevents over-expansion from large synonym groups causing query bloat.
+                        </flux:description>
+                    </flux:field>
+                @endif
             </div>
         </flux:card>
 

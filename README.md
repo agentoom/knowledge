@@ -6,7 +6,7 @@ Agentoom Knowledge is a self-hosted Knowledge Server that exposes trusted enterp
 
 📖 **[Read the full article →](ARTICLE.md)** &nbsp;|&nbsp; 🚀 **[Installation Guide →](docs/INSTALLATION.md)** &nbsp;|&nbsp; 📚 **[How to Use →](docs/HOW_TO_USE.md)** &nbsp;|&nbsp; 🔌 **[Extending →](docs/EXTENDING.md)**
 
----
+---This 
 
 ## The Problem
 
@@ -199,6 +199,7 @@ Phase 7 introduced four orthogonal search quality improvements that operate acro
 When `search_type=hybrid`, the `SemanticProvider` sends both a keyword query and a vector query to Typesense in a single request. Typesense fuses the results using its built-in hybrid ranking, balancing keyword precision with semantic recall.
 
 - **Configurable Alpha:** The keyword vs. vector weight is controlled by the `knowledge.hybrid_alpha` setting (0.0–1.0, default 0.5). Admin UI provides a slider under **Settings → Search Config**.
+- **A/B Testing in Playground:** The Search Playground includes a side-by-side comparison mode — toggle "A/B Compare" to run the same query with two different search types simultaneously and see which results each strategy surfaces (or misses), with rank-change indicators and a unique-chunk diff summary. This makes tuning the alpha slider actionable rather than guesswork.
 - **Managed Embeddings:** Uses the existing `ts/all-MiniLM-L12-v2` model configured during indexing — no external embedding calls needed.
 - **Fully Optional:** Default search (`search_type` null/absent) remains keyword-only for backward compatibility.
 
@@ -214,9 +215,11 @@ Duplicate content is detected and blocked at multiple stages of the document pip
 Query-time synonym expansion rewrites search terms using administrator-defined synonym groups before sending the query to Typesense:
 
 - **Synonym Groups:** Defined via the **Admin → Synonyms** page. Each group is a set of equivalent terms (e.g., `["car", "automobile", "vehicle"]`).
-- **Query Rewriting:** The `QueryRewriter` tokenizes the query and expands matching words into Typesense `OR` groups. For example, `"fast car"` becomes `"fast (car OR automobile OR vehicle)"`.
+- **Query Rewriting:** The `QueryRewriter` expands matching tokens by appending synonym terms to the query (Typesense's `q` parameter works with term-appended expansion, not boolean OR syntax). For example, `"deployment pipeline"` becomes `"deployment pipeline release automation \"continuous delivery\""`.
 - **Toggleable:** Controlled by the `knowledge.synonym_expansion_enabled` setting in **Settings → Search Config**. Disabling stops all expansion — no reindexing needed.
-- **Multi-word phrases:** Quoted phrases in synonym groups are preserved (e.g., `"machine learning"`).
+- **Expansion Cap:** A configurable `knowledge.synonym_expansion_max_terms` setting (default 10, range 2–100) caps how many synonym variants are appended per token. Prevents over-expansion from large synonym groups causing query bloat and precision loss.
+- **Ranking behavior:** Typesense's TF-IDF scoring treats synonym terms with equal weight to original query terms — a document matching 4 synonym terms may outrank one matching 2 original terms. The expansion cap is the primary defense: keep it low (default 10) for precision-biased deployments, raise it for recall-heavy ones.
+- **Multi-word phrases:** Multi-word synonyms are wrapped in double quotes to preserve phrase matching (e.g., `"continuous delivery"`).
 
 #### Recency-Aware Reciprocal Rank Fusion
 The RRF fusion strategy was extended with an optional recency boost that gives fresher content a scoring advantage:
@@ -226,6 +229,43 @@ The RRF fusion strategy was extended with an optional recency boost that gives f
 - **Neutral for old content:** Items without timestamps or very old content get a multiplier of ~1.0 — they are never penalized, just not boosted.
 - **Timestamp source:** The `SemanticProvider` maps Typesense's auto-added `created_at` field into the result item's `indexed_at` for recency scoring. Items from federation providers without timestamps receive neutral treatment.
 - **Backward compatible:** The `RecencyBoostConfig` parameter on `ResultFusionStrategy::fuse()` is nullable — passing `null` preserves the original RRF behavior unchanged.
+
+#### Retrieval Quality Metrics
+
+Recency boost follows exponential decay — the boost halves every half-life period. A concrete example with defaults (boostFactor = 0.3, halfLifeDays = 30):
+
+| Age | Multiplier | Effect |
+|-----|-----------|--------|
+| Brand-new (0 days) | 1.30× | Full bonus |
+| 1 week | 1.28× | ~93% of bonus remaining |
+| 1 month (half-life) | 1.15× | Half the bonus |
+| 3 months | 1.04× | Bonus nearly gone |
+| 1 year | ~1.00× | Effectively neutral — no penalty |
+
+Items without timestamps (e.g., from federation providers that don't return `indexed_at`) receive a multiplier of exactly 1.0 — they are never disadvantaged, just not boosted.
+
+#### Concrete Quality Evidence
+
+Two A/B comparisons demonstrating Phase 7 improvements on real documents:
+
+**Hybrid vs. Keyword-only** — query: `"quarterly revenue"`
+
+| Strategy | Results | Key Finding |
+|----------|---------|-------------|
+| Keyword-only | 1 result — `financial_q1.txt` (exact word match only) | Misses `meeting_notes.txt` which uses "income" and "period" instead of "revenue" |
+| Hybrid | 5 results — includes `meeting_notes.txt` | **Vector similarity catches semantically related content that different vocabulary would hide** |
+
+**Synonyms vs. No Synonyms** — query: `"deployment pipeline"`  
+Synonym groups: `["deployment", "release", "ship"]`, `["pipeline", "automation", "continuous delivery"]`
+
+| Strategy | Result | Query Sent |
+|----------|--------|-----------|
+| No synonyms | `devops.txt` (literal match) | `"deployment pipeline"` |
+| With synonyms | `infra.txt` ("release automation" / "continuous delivery") | `"deployment pipeline release ship automation \"continuous delivery\""` |
+
+Without synonyms, `infra.txt` — which describes the same concepts using different vocabulary — would never appear. Synonym expansion bridges that gap.
+
+These comparisons were produced using the **A/B Compare** toggle in the Search Playground, which shows results side-by-side with rank-change indicators and a diff summary of chunks unique to each strategy.
 
 ### Web Provider & Crawling
 The `WebProvider` fetches and converts content from configured URLs into searchable Markdown via `league/html-to-markdown`. For larger documentation sites, it supports **recursive crawling**:
@@ -252,7 +292,7 @@ The `WebProvider` fetches and converts content from configured URLs into searcha
 - **Provider SDK:** Extensible architecture with 10 contracts, `make:knowledge-provider` generator, auto-discovery via config, and full extension guide.
 - **Admin UI:** Livewire + Flux admin panel for managing sources, providers, federation servers, users, and settings.
 - **Retrieval Logging:** Full audit trail with query text, execution plans, fused results, and latency.
-- **Search Playground:** Interactive sandbox to test queries and visualize retrieval plans in real time.
+- **Search Playground:** Interactive sandbox to test queries, visualize retrieval plans in real time, and A/B compare search types side-by-side with rank-change indicators and unique-result diff summaries.
 - **Danger Zone Reset:** One-click app reset from Settings — clears all knowledge data, search indexes, and logs while preserving users and configuration.
 - **API Key Auth:** Scoped API key authentication for MCP access with separate user/service-account keys and prefix-optimized lookups.
 - **Rate Limiting:** Configurable per-API-key rate limiting on the MCP endpoint to prevent abuse.
@@ -262,7 +302,7 @@ The `WebProvider` fetches and converts content from configured URLs into searcha
 - **Horizon Queues:** Background indexing and document processing via Redis queues.
 - **Hybrid Search:** Combined keyword+vector search in Typesense with configurable alpha weighting — balances precision and semantic recall in a single query.
 - **Content Deduplication:** SHA-256 hashing at upload, parse, and sync stages prevents duplicate content from entering the index — duplicates are flagged and their chunks de-indexed.
-- **Synonym Expansion:** Configurable synonym groups expand queries at search time (e.g., "car" → "car OR automobile OR vehicle") — toggleable per deployment with no reindexing.
+- **Synonym Expansion:** Configurable synonym groups expand queries at search time (e.g., "car" → "car OR automobile OR vehicle") with a per-token expansion cap to prevent query bloat — toggleable per deployment with no reindexing.
 - **Recency-aware Ranking:** Exponential-decay recency boost in RRF fusion — fresh content surfaces higher (configurable boost factor and half-life).
 - **Apache Tika Integration:** Robust parsing for hundreds of document formats (PDF, DOCX, etc.).
 - **Passkeys + 2FA:** Fortify-powered authentication with passkeys and TOTP two-factor auth.
@@ -387,7 +427,7 @@ vendor/bin/sail artisan horizon
 - **Phase 6:** Production hardening — Laravel scheduler for periodic maintenance (Horizon snapshots, federation sync, log pruning), rate limiting on the MCP API endpoint, health-check endpoint for Docker and load balancers, notification pipeline for sync failures and high-latency alerts. ✅
 - **Phase 7:** Search quality — hybrid keyword+vector search in Typesense, content deduplication via SHA-256 hashing in the parse stage, configurable synonym expansion for query rewriting, recency-aware scoring in Reciprocal Rank Fusion so fresher content surfaces higher. ✅
 - **Phase 8:** Provider completeness — external embedding provider implementation (OpenAI, Cohere, local HuggingFace) through the existing `EmbeddingProvider` contract, MCP resources for document and source browsing, **OCR fallback for images**: a local OCR engine (e.g., PaddleOCR) running in the same Docker stack that the pipeline calls only when Tika returns empty or near-empty content from image files (jpg, png, tiff, etc.), so image-based documents become searchable without external API dependencies. Non-image parsing stays on Tika; OCR is a targeted gap-filler, not a replacement.
-- **Phase 9:** Enterprise features — activity/audit trail tracking who changed what (sources, API keys, settings), token-aware chunking that respects LLM context windows, retry/reprocess mechanism for documents stuck in `error` status after transient Tika failures, knowledge source templates for one-click setup of common configurations.
+- **Phase 9:** Enterprise features — activity/audit trail tracking who changed what (sources, API keys, settings), token-aware chunking that respects LLM context windows, retry/reprocess mechanism for documents stuck in `error` status after transient Tika failures, knowledge source templates for one-click setup of common configurations, **synonym weighting** — score documents matching original query terms higher than those matching only expanded synonyms (two-pass search or post-retrieval score penalty) to prevent recall from drowning precision when synonym groups grow large.
 - **Phase 10:** Test coverage — dedicated tests for each provider (Yaml, Json, Markdown, Web, Sql), chunking strategy tests for all four strategies, Livewire component tests for Playground, ApiKeys, DangerZone, and Dashboard.
 - **Phase 11:** Future horizons — knowledge graph traversal, semantic caching of retrieval results, multi-tenancy with row-level data isolation (schema already has `tenant_id` columns), fine-tuned embedding models for domain-specific knowledge, and additional OCR/parser improvements.
 

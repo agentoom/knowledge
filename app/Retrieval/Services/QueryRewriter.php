@@ -39,40 +39,61 @@ class QueryRewriter
             return $query;
         }
 
-        // Tokenize the query: split on whitespace and preserve punctuation as separate tokens.
+        $maxTerms = (int) Settings::get('knowledge.synonym_expansion_max_terms', 10);
+
+        // Tokenize the query: split on whitespace and preserve quoted phrases.
         $tokens = $this->tokenize($query);
 
-        // Apply synonym expansion to each token.
-        $expanded = array_map(function (string $token) use ($expansionMap): string {
+        // Collect expanded terms to append to the original query.
+        // Typesense q parameter doesn't support boolean OR syntax — instead
+        // we append synonym terms so Typesense ranks matches on any term.
+        $originalTerms = [];
+        $expansionTerms = [];
+
+        foreach ($tokens as $token) {
             $normalized = mb_strtolower($token);
+            $originalTerms[] = $token;
 
             if (isset($expansionMap[$normalized])) {
                 $synonyms = $expansionMap[$normalized];
-                $parts = array_map(function (string $synonym) use ($token): string {
-                    // Preserve original casing if the original token was capitalized
-                    if (mb_strtolower($token) !== $token) {
-                        return $synonym;
+
+                // Cap the number of expanded terms to prevent query bloat.
+                if (count($synonyms) > $maxTerms) {
+                    $synonyms = array_slice($synonyms, 0, $maxTerms);
+                }
+
+                foreach ($synonyms as $synonym) {
+                    $synLower = mb_strtolower($synonym);
+
+                    // Don't add the original token as an expansion.
+                    if ($synLower === $normalized) {
+                        continue;
                     }
 
-                    return mb_strtolower($synonym);
-                }, $synonyms);
-
-                // Quote multi-word phrases for Typesense compatibility
-                $parts = array_map(function (string $part): string {
-                    if (str_contains($part, ' ')) {
-                        return '"'.$part.'"';
+                    // Quote multi-word phrases.
+                    if (str_contains($synonym, ' ')) {
+                        $expansionTerms[] = '"'.$synonym.'"';
+                    } else {
+                        $expansionTerms[] = $synonym;
                     }
-
-                    return $part;
-                }, $parts);
-
-                return '('.implode(' OR ', array_unique($parts)).')';
+                }
             }
+        }
 
-            return $token;
-        }, $tokens);
+        if ($expansionTerms === []) {
+            return $query;
+        }
 
-        return implode(' ', $expanded);
+        // Append unique expansion terms. The expanded query looks like:
+        //   "deployment pipeline" release ship automation "continuous delivery"
+        // Typesense matches documents containing any subset of these terms.
+        // Note: Typesense's native TF-IDF scoring gives synonym terms equal
+        // weight to original terms. The expansion cap (max_terms) is the primary
+        // defense against synonym-rich documents dominating ranking — keep it low
+        // (default 10) for precision, increase for recall-heavy deployments.
+        $unique = array_unique($expansionTerms);
+
+        return $query.' '.implode(' ', $unique);
     }
 
     /**

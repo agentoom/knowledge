@@ -25,13 +25,51 @@
                 <div class="w-full md:w-48">
                     <flux:field>
                         <flux:label>Search Type</flux:label>
-                        <flux:select wire:model="searchType">
-                            <flux:select.option value="hybrid">Hybrid (Auto)</flux:select.option>
-                            <flux:select.option value="semantic">Semantic Only</flux:select.option>
-                            <flux:select.option value="structured">Structured Only</flux:select.option>
-                        </flux:select>
+                        <div class="relative" wire:loading.class="opacity-60 transition-opacity">
+                            <flux:select wire:model.live="searchType">
+                                @foreach ($searchTypeOptions as $value => $label)
+                                    @if (! $abMode || $value !== $searchTypeB)
+                                        <flux:select.option value="{{ $value }}">{{ $label }}</flux:select.option>
+                                    @endif
+                                @endforeach
+                            </flux:select>
+                            <div wire:loading wire:target="searchType" class="absolute inset-y-0 right-8 flex items-center pointer-events-none">
+                                <flux:icon.loading variant="micro" class="animate-spin text-zinc-400" />
+                            </div>
+                        </div>
                     </flux:field>
                 </div>
+
+                {{-- A/B Comparison Toggle --}}
+                <div class="w-full md:w-48">
+                    <flux:field>
+                        <flux:label>&nbsp;</flux:label>
+                        <div class="flex items-center gap-2 h-10">
+                            <flux:switch wire:model.live="abMode" />
+                            <span class="text-sm text-zinc-600 dark:text-zinc-400">A/B Compare</span>
+                        </div>
+                    </flux:field>
+                </div>
+
+                @if ($abMode)
+                <div class="w-full md:w-48">
+                    <flux:field>
+                        <flux:label>Compare vs.</flux:label>
+                        <div class="relative" wire:loading.class="opacity-60 transition-opacity">
+                            <flux:select wire:model.live="searchTypeB">
+                                @foreach ($searchTypeOptions as $value => $label)
+                                    @if ($value !== $searchType)
+                                        <flux:select.option value="{{ $value }}">{{ $label }}</flux:select.option>
+                                    @endif
+                                @endforeach
+                            </flux:select>
+                            <div wire:loading wire:target="searchTypeB" class="absolute inset-y-0 right-8 flex items-center pointer-events-none">
+                                <flux:icon.loading variant="micro" class="animate-spin text-zinc-400" />
+                            </div>
+                        </div>
+                    </flux:field>
+                </div>
+                @endif
                 <div class="flex items-end">
                     <flux:button type="submit" variant="primary" icon="magnifying-glass" :loading="$isSearching" class="w-full md:w-auto">
                         Execute Search
@@ -131,6 +169,97 @@
                 </div>
             </div>
         </div>
+
+        {{-- A/B Comparison Results --}}
+        @if ($sideB && isset($sideB['result']))
+            <flux:separator class="my-6" />
+
+            <div>
+                <flux:heading size="md" class="mb-4">
+                    A/B Comparison:
+                    <span class="text-blue-600">{{ $searchTypeOptions[$searchType] ?? 'Side A' }}</span>
+                    vs
+                    <span class="text-purple-600">{{ $searchTypeOptions[$searchTypeB] ?? 'Side B' }}</span>
+                </flux:heading>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {{-- Side A Summary --}}
+                    <div class="p-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+                        <div class="flex justify-between items-center mb-3">
+                            <flux:badge color="blue">Side A — {{ $searchTypeOptions[$searchType] ?? 'A' }}</flux:badge>
+                            <span class="text-xs text-zinc-500">{{ $result->totalCount }} results · {{ round($latency, 1) }}ms</span>
+                        </div>
+
+                        <div class="space-y-1.5">
+                            @foreach (array_slice($result->items, 0, 5) as $item)
+                                <div class="flex items-center gap-2 text-sm">
+                                    <span class="text-xs text-zinc-400 w-5">#{{ $loop->index + 1 }}</span>
+                                    <span class="truncate text-zinc-700 dark:text-zinc-300">{{ \Illuminate\Support\Str::limit(strip_tags($item['content'] ?? ($item['title'] ?? '')), 60) }}</span>
+                                    <span class="text-xs text-zinc-400 ml-auto whitespace-nowrap">{{ round($item['score'] ?? 0, 4) }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- Side B Summary --}}
+                    <div class="p-4 rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20">
+                        <div class="flex justify-between items-center mb-3">
+                            <flux:badge color="purple">Side B — {{ $searchTypeOptions[$searchTypeB] ?? 'B' }}</flux:badge>
+                            <span class="text-xs text-zinc-500">{{ $sideB['result']->totalCount }} results · {{ round($sideB['latency'], 1) }}ms</span>
+                        </div>
+
+                        <div class="space-y-1.5">
+                            @foreach (array_slice($sideB['result']->items, 0, 5) as $item)
+                                @php
+                                    $foundInA = collect($result->items)->firstWhere('chunk_id', $item['chunk_id'] ?? null);
+                                    $rankInA = $foundInA ? collect($result->items)->search($foundInA) + 1 : null;
+                                @endphp
+                                <div class="flex items-center gap-2 text-sm">
+                                    <span class="text-xs text-zinc-400 w-5">#{{ $loop->index + 1 }}</span>
+                                    <span class="truncate text-zinc-700 dark:text-zinc-300">{{ \Illuminate\Support\Str::limit(strip_tags($item['content'] ?? ($item['title'] ?? '')), 60) }}</span>
+                                    <span class="text-xs text-zinc-400 ml-auto whitespace-nowrap">{{ round($item['score'] ?? 0, 4) }}</span>
+                                    @if ($rankInA)
+                                        <span class="text-xs text-zinc-400" title="Rank {{ $rankInA }} in Side A">
+                                            @if ($rankInA > $loop->index + 1)
+                                                ⬆️
+                                            @elseif ($rankInA < $loop->index + 1)
+                                                ⬇️
+                                            @else
+                                                =
+                                            @endif
+                                        </span>
+                                    @else
+                                        <span class="text-xs text-green-500 font-medium" title="Only in Side B">✨ new</span>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Diff Analysis --}}
+                @php
+                    $aIds = collect($result->items)->pluck('chunk_id')->filter()->toArray();
+                    $bIds = collect($sideB['result']->items)->pluck('chunk_id')->filter()->toArray();
+                    $onlyInB = array_diff($bIds, $aIds);
+                    $onlyInA = array_diff($aIds, $bIds);
+                @endphp
+
+                <div class="mt-3 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-600 dark:text-zinc-400">
+                    <strong>Diff:</strong>
+                    @if (count($onlyInB) > 0)
+                        <span class="text-purple-600 dark:text-purple-400">{{ count($onlyInB) }} chunk(s) unique to Side B</span>
+                    @endif
+                    @if (count($onlyInA) > 0)
+                        @if (count($onlyInB) > 0) &middot; @endif
+                        <span class="text-blue-600 dark:text-blue-400">{{ count($onlyInA) }} chunk(s) unique to Side A</span>
+                    @endif
+                    @if (count($onlyInA) === 0 && count($onlyInB) === 0)
+                        <span>Both sides returned the same chunks (ordering may differ).</span>
+                    @endif
+                </div>
+            </div>
+        @endif
     @else
         <div class="py-24 flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-800">
             <flux:icon icon="rocket-launch" class="size-16 text-zinc-200 dark:text-zinc-800 mb-6" />

@@ -21,8 +21,12 @@ test('rewrites a single matching word', function () {
 
     $result = $rewriter->rewrite('fast car');
 
+    // The original query is preserved; synonym terms are appended.
+    // "fast (car OR ...)" → "fast car automobile vehicle"
     expect($result)->toContain('fast')
-        ->toContain('(car OR automobile OR vehicle)');
+        ->toContain('car')
+        ->toContain('automobile')
+        ->toContain('vehicle');
 });
 
 test('rewrites multiple matching words independently', function () {
@@ -32,8 +36,11 @@ test('rewrites multiple matching words independently', function () {
 
     $result = $rewriter->rewrite('quick car');
 
-    expect($result)->toContain('(quick OR fast)')
-        ->toContain('(car OR auto)');
+    // Both tokens expand: quick→fast, car→auto
+    expect($result)->toContain('quick')
+        ->toContain('fast')
+        ->toContain('car')
+        ->toContain('auto');
 });
 
 test('preserves original query when no synonyms match', function () {
