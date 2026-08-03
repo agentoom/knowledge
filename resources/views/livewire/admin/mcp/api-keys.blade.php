@@ -54,6 +54,7 @@
         <flux:table.columns>
             <flux:table.column>Name</flux:table.column>
             <flux:table.column>Scopes</flux:table.column>
+            <flux:table.column>Namespaces</flux:table.column>
             <flux:table.column>Last Used</flux:table.column>
             <flux:table.column>Expires</flux:table.column>
             <flux:table.column>Actions</flux:table.column>
@@ -67,6 +68,15 @@
                     @foreach ($key->scopes as $scope)
                         <flux:badge size="sm">{{ $scope }}</flux:badge>
                     @endforeach
+                </flux:table.cell>
+                <flux:table.cell>
+                    @if ($key->knowledge_namespaces)
+                        @foreach ($key->knowledge_namespaces as $ns)
+                            <flux:badge size="sm" color="indigo">{{ $ns }}</flux:badge>
+                        @endforeach
+                    @else
+                        <span class="text-sm text-gray-500">All</span>
+                    @endif
                 </flux:table.cell>
                 <flux:table.cell>{{ $key->last_used_at?->diffForHumans() ?? 'Never' }}</flux:table.cell>
                 <flux:table.cell>
@@ -111,6 +121,25 @@
                     </div>
                     <flux:error name="scopes" />
                 </flux:field>
+
+                @if (count($availableNamespaces) > 0)
+                <flux:field>
+                    <flux:label>Knowledge Namespaces</flux:label>
+                    <flux:description class="mb-2">Restrict access to specific namespaces. Leave empty to allow all.</flux:description>
+                    <div class="flex gap-2 mb-2">
+                        <flux:button size="sm" variant="outline" wire:click="selectAllNamespaces">Select All</flux:button>
+                        <flux:button size="sm" variant="outline" wire:click="deselectAllNamespaces">Deselect All</flux:button>
+                    </div>
+                    <div class="space-y-2 mt-1">
+                        @foreach ($availableNamespaces as $ns)
+                            <label class="flex items-center gap-2">
+                                <flux:checkbox wire:model="knowledgeNamespaces" value="{{ $ns }}" />
+                                <span class="text-sm">{{ $ns }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                </flux:field>
+                @endif
 
                 <flux:field>
                     <flux:label>Expiration Date</flux:label>

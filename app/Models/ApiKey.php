@@ -19,8 +19,8 @@ class ApiKey extends Model
         'user_id',
         'name',
         'key',
-        'key_prefix',
         'scopes',
+        'knowledge_namespaces',
         'last_used_at',
         'expires_at',
     ];
@@ -29,6 +29,7 @@ class ApiKey extends Model
     {
         return [
             'scopes' => 'array',
+            'knowledge_namespaces' => 'array',
             'last_used_at' => 'datetime',
             'expires_at' => 'datetime',
         ];

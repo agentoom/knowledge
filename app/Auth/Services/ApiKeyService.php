@@ -11,8 +11,9 @@ class ApiKeyService
 {
     /**
      * @param  array<int, string>  $scopes
+     * @param  array<int, string>  $knowledgeNamespaces
      */
-    public function create(string $name, int $userId, array $scopes = [], \DateTimeInterface|string|null $expiresAt = null): ApiKey
+    public function create(string $name, int $userId, array $scopes = [], array $knowledgeNamespaces = [], \DateTimeInterface|string|null $expiresAt = null): ApiKey
     {
         $plainKey = Str::random(64);
 
@@ -22,6 +23,7 @@ class ApiKeyService
             'key' => Hash::make($plainKey),
             'key_prefix' => substr($plainKey, 0, 8),
             'scopes' => $scopes,
+            'knowledge_namespaces' => $knowledgeNamespaces,
             'expires_at' => $expiresAt,
         ]);
 
@@ -43,10 +45,15 @@ class ApiKeyService
             $storedScopes = $apiKey->scopes;
             $scopes = is_array($storedScopes) ? $storedScopes : [];
 
+            /** @var string|array<int, string>|null $storedNamespaces */
+            $storedNamespaces = $apiKey->knowledge_namespaces;
+            $namespaces = is_array($storedNamespaces) ? $storedNamespaces : [];
+
             $newKey = $this->create(
                 name: $apiKey->name,
                 userId: $apiKey->user_id,
                 scopes: $scopes,
+                knowledgeNamespaces: $namespaces,
                 expiresAt: $apiKey->expires_at,
             );
 
