@@ -11,18 +11,25 @@ use App\Providers\Sql\SqlProvider;
 use App\Providers\VectorStore\SemanticProvider;
 use App\Providers\Web\WebProvider;
 use App\Providers\Yaml\YamlProvider;
+use App\Services\ActivityLogger;
 use Illuminate\Support\Facades\Config;
 
 class KnowledgeSourceObserver
 {
+    public function __construct(private readonly ActivityLogger $logger) {}
+
     public function created(KnowledgeSource $source): void
     {
+        $this->logger->safeRecord('knowledge_source.created', $source, $this->safeAttributes($source));
+
         $this->ensureProviderExists($source);
         $this->dispatchPipeline($source);
     }
 
     public function updated(KnowledgeSource $source): void
     {
+        $this->logger->safeRecord('knowledge_source.updated', $source, $this->changedAttributes($source));
+
         $this->ensureProviderExists($source);
 
         // Only trigger the pipeline when provider config or active status
@@ -34,7 +41,49 @@ class KnowledgeSourceObserver
 
     public function deleted(KnowledgeSource $source): void
     {
+        $this->logger->safeRecord('knowledge_source.deleted', $source, $this->safeAttributes($source));
+
         $source->providers()->delete();
+    }
+
+    /**
+     * Changed attributes resolved through getAttribute() so array casts come
+     * back as real arrays. The raw JSON string form would hide nested keys
+     * (e.g. connection.password) from the logger's recursive redaction.
+     *
+     * @return array<string, mixed>
+     */
+    private function changedAttributes(KnowledgeSource $source): array
+    {
+        $changes = [];
+
+        foreach (array_keys($source->getChanges()) as $field) {
+            $changes[$field] = $source->getAttribute($field);
+        }
+
+        return $changes;
+    }
+
+    /**
+     * Record only non-sensitive attributes for create/delete events.
+     *
+     * provider_config is deliberately excluded: SQL dynamic connections
+     * store encrypted credentials that must never enter the audit trail.
+     *
+     * @return array<string, mixed>
+     */
+    private function safeAttributes(KnowledgeSource $source): array
+    {
+        return array_intersect_key($source->getAttributes(), array_flip([
+            'id',
+            'name',
+            'slug',
+            'namespace',
+            'provider_type',
+            'description',
+            'is_active',
+            'priority',
+        ]));
     }
 
     private function ensureProviderExists(KnowledgeSource $source): void

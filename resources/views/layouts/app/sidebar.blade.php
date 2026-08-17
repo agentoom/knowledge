@@ -30,6 +30,9 @@
                     <flux:sidebar.item icon="list-bullet" :href="route('admin.retrieval-logs.index')" :current="request()->routeIs('admin.retrieval-logs.*')" wire:navigate>
                         Search Logs
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="clock" :href="route('admin.activity-log')" :current="request()->routeIs('admin.activity-log')" wire:navigate>
+                        Activity Log
+                    </flux:sidebar.item>
                     <flux:sidebar.item icon="key" :href="route('admin.mcp.api-keys')" :current="request()->routeIs('admin.mcp.*')" wire:navigate>
                         MCP
                     </flux:sidebar.item>

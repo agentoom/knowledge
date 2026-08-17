@@ -56,7 +56,7 @@ test('chunk document creates chunks from content', function () {
         'filename' => 'doc.md',
         'mime_type' => 'text/markdown',
         'content' => 'Short content for testing chunking.',
-        'status' => 'normalized',
+        'status' => 'parsed',
     ]);
 
     $job = new ChunkDocument($document->id);
@@ -88,7 +88,7 @@ test('chunk document handles empty content', function () {
         'path' => '/test/empty.txt',
         'filename' => 'empty.txt',
         'content' => '',
-        'status' => 'normalized',
+        'status' => 'parsed',
     ]);
 
     $job = new ChunkDocument($document->id);
@@ -138,7 +138,7 @@ test('parse document updates content and status', function () {
     }
 });
 
-test('parse document handles errors gracefully', function () {
+test('parse document persists the error state and rethrows for retry', function () {
     Http::fake([
         '*' => Http::response('Server Error', 500),
     ]);
@@ -163,7 +163,8 @@ test('parse document handles errors gracefully', function () {
 
     try {
         $job = new ParseDocument($document->id);
-        app()->call([$job, 'handle']);
+
+        expect(fn () => app()->call([$job, 'handle']))->toThrow(RuntimeException::class, 'Tika parsing failed');
 
         $document->refresh();
 

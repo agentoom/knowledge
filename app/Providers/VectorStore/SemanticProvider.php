@@ -3,7 +3,10 @@
 namespace App\Providers\VectorStore;
 
 use App\Contracts\KnowledgeProvider;
+use App\Contracts\VectorStore;
+use App\Embedding\Services\EmbeddingManager;
 use App\Knowledge\Models\ProviderMetadata;
+use App\Retrieval\Models\RewrittenQuery;
 use App\Retrieval\Models\SearchQuery;
 use App\Retrieval\Models\SearchResult;
 use App\Retrieval\Services\QueryRewriter;
@@ -32,30 +35,17 @@ class SemanticProvider implements KnowledgeProvider
     public function search(SearchQuery $query): SearchResult
     {
         $rewriter = app(QueryRewriter::class);
-        $rewrittenQuery = $rewriter->rewrite($query->query);
+        $expanded = $rewriter->expand($query->query);
 
-        $searchParams = [
-            'q' => $rewrittenQuery,
-            'query_by' => 'content, document_filename',
-        ];
+        $driver = $this->vectorStore->driver();
+        $embeddingManager = app(EmbeddingManager::class);
 
-        if ($query->searchType === 'hybrid') {
-            $alpha = $this->getHybridAlpha();
-            // Typesense managed embeddings: use q=* (match-all) and pass the actual
-            // query text inside vector_query so Typesense computes the vector from it.
-            $searchParams['q'] = '*';
-            $searchParams['vector_query'] = 'embedding:([], alpha: '.$alpha.', query: '.json_encode($rewrittenQuery, JSON_THROW_ON_ERROR).')';
-        }
+        // Managed mode only when the vector store advertises the capability AND
+        // the active provider is the managed (typesense) mode.
+        $managed = $embeddingManager->isManaged()
+            && in_array('managed_embeddings', $driver->capabilities(), true);
 
-        if ($query->namespace && $query->namespace !== 'global') {
-            $searchParams['filter_by'] = "namespace:={$query->namespace}";
-        }
-
-        $hits = $this->vectorStore->driver()->search(
-            collection: $this->collection,
-            query: $searchParams,
-            limit: $query->maxResults
-        );
+        $hits = $this->execute($query, $expanded, $driver, $embeddingManager, $managed);
 
         // Filter out hits that reference non-indexed documents (duplicate, stale, error).
         $validDocIds = DB::table('documents')
@@ -107,6 +97,165 @@ class SemanticProvider implements KnowledgeProvider
     }
 
     /**
+     * Run the driver search(es) for the expanded query.
+     *
+     * When synonym weighting is enabled and the query actually expanded, two
+     * bounded searches run: pass A on the original query, pass B on the
+     * rewritten query. Items are merged by chunk_id keeping pass-A order;
+     * pass-B-only items are appended with their score penalized. Otherwise a
+     * single search on the rewritten query runs — identical to the legacy path.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function execute(
+        SearchQuery $query,
+        RewrittenQuery $expanded,
+        VectorStore $driver,
+        EmbeddingManager $embeddingManager,
+        bool $managed,
+    ): array {
+        if ($this->isWeightingEnabled() && $expanded->hasExpansion()) {
+            $recall = min(250, max($query->maxResults * 2, 50));
+
+            $passA = $this->rawSearch(
+                queryText: $expanded->original,
+                query: $query,
+                limit: $recall,
+                driver: $driver,
+                embeddingManager: $embeddingManager,
+                managed: $managed,
+                usePassQueryAsKeyword: true,
+            );
+
+            $passB = $this->rawSearch(
+                queryText: $expanded->rewritten,
+                query: $query,
+                limit: $recall,
+                driver: $driver,
+                embeddingManager: $embeddingManager,
+                managed: $managed,
+                usePassQueryAsKeyword: true,
+            );
+
+            return $this->mergeWeightedPasses($passA, $passB, $this->penaltyFactor(), $query->maxResults);
+        }
+
+        return $this->rawSearch(
+            queryText: $expanded->rewritten,
+            query: $query,
+            limit: $query->maxResults,
+            driver: $driver,
+            embeddingManager: $embeddingManager,
+            managed: $managed,
+            usePassQueryAsKeyword: false,
+        );
+    }
+
+    /**
+     * Build the Typesense parameters for a supplied query text and return the
+     * raw hits. The search type and namespace filter come from the query.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function rawSearch(
+        string $queryText,
+        SearchQuery $query,
+        int $limit,
+        VectorStore $driver,
+        EmbeddingManager $embeddingManager,
+        bool $managed,
+        bool $usePassQueryAsKeyword,
+    ): array {
+        $searchParams = [
+            'q' => $queryText,
+            'query_by' => 'content, document_filename',
+        ];
+
+        if ($query->searchType === 'hybrid') {
+            $alpha = $this->getHybridAlpha();
+
+            if ($managed) {
+                // Typesense managed embeddings: the vector is computed from the
+                // real pass query text. In the weighted two-pass mode the keyword
+                // half keeps the pass query too, so original-term evidence is
+                // not discarded; the legacy single-pass path keeps q=* (match-all).
+                if (! $usePassQueryAsKeyword) {
+                    $searchParams['q'] = '*';
+                }
+
+                $searchParams['vector_query'] = 'embedding:([], alpha: '.$alpha.', query: '.json_encode($queryText, JSON_THROW_ON_ERROR).')';
+            } else {
+                // External embedding provider: compute the query vector locally and
+                // pass the raw vector — the driver translates it into vector_query
+                // syntax while q keeps the keyword half of the hybrid search.
+                $searchParams['vector_query'] = $embeddingManager
+                    ->provider()
+                    ->embed($queryText, 'search_query');
+                $searchParams['vector_alpha'] = $alpha;
+            }
+        } elseif ($query->searchType === 'semantic' && ! $managed) {
+            // Pure vector search with an external provider: match-all keyword
+            // query plus a raw vector; the driver translates it into vector_query.
+            $searchParams['q'] = '*';
+            $searchParams['vector_query'] = $embeddingManager
+                ->provider()
+                ->embed($queryText, 'search_query');
+        }
+
+        if ($query->namespace && $query->namespace !== 'global') {
+            $searchParams['filter_by'] = "namespace:={$query->namespace}";
+        }
+
+        return $driver->search(
+            collection: $this->collection,
+            query: $searchParams,
+            limit: $limit
+        );
+    }
+
+    /**
+     * Merge the two passes by chunk_id, preserving pass-A order and applying
+     * the penalty to pass-B-only items, then truncate to maxResults.
+     *
+     * @param  array<int, array<string, mixed>>  $passA
+     * @param  array<int, array<string, mixed>>  $passB
+     * @return array<int, array<string, mixed>>
+     */
+    private function mergeWeightedPasses(array $passA, array $passB, float $penalty, int $maxResults): array
+    {
+        $merged = [];
+        $seen = [];
+
+        foreach ($passA as $hit) {
+            $chunkId = (string) ($hit['document']['chunk_id'] ?? '');
+
+            if ($chunkId !== '') {
+                $seen[$chunkId] = true;
+            }
+
+            $merged[] = $hit;
+        }
+
+        foreach ($passB as $hit) {
+            $chunkId = (string) ($hit['document']['chunk_id'] ?? '');
+
+            if ($chunkId !== '' && isset($seen[$chunkId])) {
+                continue;
+            }
+
+            if ($chunkId !== '') {
+                $seen[$chunkId] = true;
+            }
+
+            $hit['text_match'] = ($hit['text_match'] ?? 0) * $penalty;
+
+            $merged[] = $hit;
+        }
+
+        return array_slice($merged, 0, $maxResults);
+    }
+
+    /**
      * Read the hybrid search alpha parameter from settings.
      *
      * Alpha controls the keyword vs. vector balance in Typesense hybrid search.
@@ -117,6 +266,18 @@ class SemanticProvider implements KnowledgeProvider
         $alpha = Settings::get('knowledge.hybrid_alpha', 0.5);
 
         return (float) max(0.0, min(1.0, $alpha));
+    }
+
+    private function isWeightingEnabled(): bool
+    {
+        return (bool) Settings::get('knowledge.synonym_weighting_enabled', false);
+    }
+
+    private function penaltyFactor(): float
+    {
+        $factor = (float) Settings::get('knowledge.synonym_penalty_factor', 0.5);
+
+        return max(0.0, min(1.0, $factor));
     }
 
     public function supports(string $operation): bool

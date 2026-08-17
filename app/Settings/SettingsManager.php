@@ -139,8 +139,20 @@ class SettingsManager implements SettingsManagerContract
 
     public function forget(string $key): void
     {
+        $setting = Setting::where('key', $key)->first();
+        $oldValue = $setting ? $this->castValue($setting->value, $setting->type) : null;
+        $type = $setting?->type ?? 'string';
+
         Setting::where('key', $key)->delete();
         $this->cache->forget("setting:{$key}");
+
+        event(new SettingsChanged(
+            key: $key,
+            oldValue: $oldValue,
+            newValue: null,
+            type: $type,
+            userId: Auth::id(),
+        ));
     }
 
     public function all(string $group): array

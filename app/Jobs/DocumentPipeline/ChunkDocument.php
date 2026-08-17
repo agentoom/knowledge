@@ -4,7 +4,10 @@ namespace App\Jobs\DocumentPipeline;
 
 use App\Contracts\ChunkingStrategy;
 use App\DocumentPipeline\Services\ChunkingStrategyRegistry;
+use App\DocumentPipeline\Services\TokenAwareChunker;
+use App\DocumentPipeline\Services\TokenCounter;
 use App\Knowledge\Models\Document;
+use App\Settings\Facades\Settings;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -39,7 +42,25 @@ class ChunkDocument implements ShouldQueue
 
         $strategy = $this->resolveChunkingStrategy($document);
 
-        $chunks = $strategy->chunk($content);
+        $maxTokens = (int) Settings::get('knowledge.chunk_max_tokens', 384);
+        $overlapTokens = (int) Settings::get('knowledge.chunk_overlap_tokens', 64);
+
+        $chunks = app(TokenAwareChunker::class)->chunk(
+            strategy: $strategy,
+            content: $content,
+            maxTokens: $maxTokens,
+            overlapTokens: $overlapTokens,
+        );
+
+        $tokenCounter = app(TokenCounter::class);
+
+        // De-index the previous chunks before replacing them so retries or
+        // config changes never leave orphaned vectors behind.
+        $oldChunkIds = $document->chunks()->pluck('id')->toArray();
+
+        if (! empty($oldChunkIds)) {
+            DeindexDocument::dispatch($oldChunkIds);
+        }
 
         $document->chunks()->delete();
 
@@ -47,7 +68,7 @@ class ChunkDocument implements ShouldQueue
             $chunk = $document->chunks()->create([
                 'sequence' => $sequence,
                 'content' => $chunkContent,
-                'token_count' => str_word_count($chunkContent),
+                'token_count' => $tokenCounter->count($chunkContent),
                 'metadata' => [
                     'document_filename' => $document->filename,
                     'source_namespace' => $document->metadata['namespace'] ?? null,

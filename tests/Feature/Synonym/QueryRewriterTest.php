@@ -80,3 +80,47 @@ test('isEnabled reads from settings', function () {
 
     expect($rewriter->isEnabled())->toBeFalse();
 });
+
+test('expand decomposes the query into original and expansion terms', function () {
+    $this->service->create(['car', 'automobile', 'vehicle']);
+    $rewriter = new QueryRewriter($this->service);
+
+    $expanded = $rewriter->expand('fast car');
+
+    expect($expanded->original)->toBe('fast car')
+        ->and($expanded->rewritten)->toContain('fast')
+        ->and($expanded->rewritten)->toContain('automobile')
+        ->and($expanded->originalTerms)->toBe(['fast', 'car'])
+        ->and($expanded->expansionTerms)->toBe(['automobile', 'vehicle'])
+        ->and($expanded->hasExpansion())->toBeTrue();
+});
+
+test('expand keeps the original query when disabled or unmatched', function () {
+    $rewriter = new QueryRewriter($this->service);
+
+    $expanded = $rewriter->expand('unique phrase');
+
+    expect($expanded->original)->toBe('unique phrase')
+        ->and($expanded->rewritten)->toBe('unique phrase')
+        ->and($expanded->expansionTerms)->toBe([])
+        ->and($expanded->hasExpansion())->toBeFalse();
+
+    Settings::set('knowledge.synonym_expansion_enabled', false, 'boolean');
+    $this->service->create(['hello', 'hi']);
+    $rewriter = new QueryRewriter($this->service);
+
+    $disabled = $rewriter->expand('hello world');
+
+    expect($disabled->rewritten)->toBe('hello world')
+        ->and($disabled->expansionTerms)->toBe([])
+        ->and($disabled->hasExpansion())->toBeFalse();
+});
+
+test('rewrite delegates to expand', function () {
+    $this->service->create(['car', 'automobile']);
+    $rewriter = new QueryRewriter($this->service);
+
+    $expanded = $rewriter->expand('fast car');
+
+    expect($rewriter->rewrite('fast car'))->toBe($expanded->rewritten);
+});

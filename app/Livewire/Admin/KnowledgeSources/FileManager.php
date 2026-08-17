@@ -350,6 +350,16 @@ class FileManager extends Component
         $this->statusMessage = 'File deleted.';
     }
 
+    public function reprocess(int $documentId): void
+    {
+        $document = Document::with('knowledgeSource')->findOrFail($documentId);
+
+        app(PipelineOrchestrator::class)->reprocess($document);
+
+        $this->refreshFiles();
+        $this->statusMessage = 'Document reprocessing queued.';
+    }
+
     public function deleteDocument(int $documentId): void
     {
         $document = Document::where('id', $documentId)

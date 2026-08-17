@@ -12,6 +12,7 @@
                 'general'       => 'General',
                 'search-config' => 'Search Config',
                 'vector-store'  => 'Vector Store',
+                'embedding'     => 'Embedding',
                 'storage'       => 'Storage',
                 'notifications' => 'Notifications',
                 'rate-limiting' => 'Rate Limiting',
@@ -50,6 +51,9 @@
     </div>
     <div wire:key="tab-vector-store" @class(['hidden' => $tab !== 'vector-store'])>
         @livewire(\App\Livewire\Admin\Settings\VectorStore::class)
+    </div>
+    <div wire:key="tab-embedding" @class(['hidden' => $tab !== 'embedding'])>
+        @livewire(\App\Livewire\Admin\Settings\Embedding::class)
     </div>
     <div wire:key="tab-storage" @class(['hidden' => $tab !== 'storage'])>
         @livewire(\App\Livewire\Admin\Settings\Storage::class)

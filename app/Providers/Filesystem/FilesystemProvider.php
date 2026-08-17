@@ -4,6 +4,7 @@ namespace App\Providers\Filesystem;
 
 use App\Concerns\StoresKnowledgeFiles;
 use App\Contracts\FilesystemKnowledgeProvider;
+use App\DocumentPipeline\Services\TikaService;
 use App\Knowledge\Models\ProviderMetadata;
 use App\Retrieval\Models\SearchQuery;
 use App\Retrieval\Models\SearchResult;
@@ -31,6 +32,16 @@ class FilesystemProvider implements FilesystemKnowledgeProvider
 
     public function allowedExtensions(): array
     {
+        // When Tika is reachable, the provider expands to accept every format
+        // Tika can parse (including images that the OCR fallback makes
+        // searchable). Without Tika, only the base list is accepted.
+        if (app(TikaService::class)->isAvailable()) {
+            return array_values(array_unique(array_merge(
+                $this->extensions,
+                config('knowledge.tika_enabled_extensions', [])
+            )));
+        }
+
         return $this->extensions;
     }
 

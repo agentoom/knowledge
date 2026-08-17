@@ -9,6 +9,7 @@ use App\Knowledge\Models\KnowledgeSource;
 use App\Listeners\CheckSearchLatency;
 use App\Listeners\LogSettingsChange;
 use App\Models\ApiKey;
+use App\Observers\ApiKeyObserver;
 use App\Observers\KnowledgeSourceObserver;
 use App\Settings\Facades\Settings;
 use Carbon\CarbonImmutable;
@@ -44,6 +45,7 @@ class AppServiceProvider extends ServiceProvider
         $this->configureRateLimiting();
 
         KnowledgeSource::observe(KnowledgeSourceObserver::class);
+        ApiKey::observe(ApiKeyObserver::class);
     }
 
     private function registerAuthGuard(): void

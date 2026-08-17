@@ -7,7 +7,9 @@ use App\Contracts\PlannerStrategy;
 use App\Contracts\ResultFusionStrategy;
 use App\Contracts\SettingsManager as SettingsManagerContract;
 use App\DocumentPipeline\Services\ChunkingStrategyRegistry;
+use App\Embedding\Services\EmbeddingManager;
 use App\Federation\FederationManager;
+use App\Knowledge\Services\KnowledgeSourceTemplateRegistry;
 use App\Planning\Strategies\DefaultPlanner;
 use App\Planning\Strategies\FederationPlanner;
 use App\Retrieval\Fusion\ReciprocalRankFusion;
@@ -45,9 +47,11 @@ class KnowledgeServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(ChunkingStrategyRegistry::class);
+        $this->app->singleton(KnowledgeSourceTemplateRegistry::class);
         $this->app->singleton(FederationManager::class);
         $this->app->singleton(SynonymService::class);
         $this->app->singleton(QueryRewriter::class);
+        $this->app->singleton(EmbeddingManager::class);
     }
 
     public function boot(): void {}

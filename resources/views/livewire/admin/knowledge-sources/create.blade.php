@@ -51,6 +51,36 @@
                 </div>
 
                 <div class="space-y-6">
+                    {{-- Template selector --}}
+                    <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
+                        <flux:heading size="sm" class="mb-3">Start from a template</flux:heading>
+                        <div class="flex items-end gap-4">
+                            <flux:field class="flex-1">
+                                <flux:select wire:model="selectedTemplate" class="max-w-lg">
+                                    <flux:select.option value="">Blank source</flux:select.option>
+                                    @foreach ($templates as $key => $template)
+                                        <flux:select.option value="{{ $key }}">
+                                            {{ $template['label'] }} — {{ $template['description'] }}
+                                        </flux:select.option>
+                                    @endforeach
+                                </flux:select>
+                                <flux:error name="selectedTemplate" />
+                                <flux:description>
+                                    Templates prefill the wizard. Review and complete provider-specific values (URLs, SQL table, credentials) before creating.
+                                </flux:description>
+                            </flux:field>
+                            <flux:button
+                                variant="outline"
+                                wire:click="applyTemplate(selectedTemplate)"
+                                :disabled="! $selectedTemplate"
+                            >
+                                Apply template
+                            </flux:button>
+                        </div>
+                    </div>
+
+                    <flux:separator />
+
                     {{-- Name --}}
                     <flux:field>
                         <flux:label>Name</flux:label>

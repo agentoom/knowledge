@@ -30,9 +30,15 @@ class TypesenseVectorStore implements VectorStoreContract
     {
         $url = "{$this->host}/collections/{$collection}/documents";
 
+        $payload = $document;
+
+        if ($embedding !== null) {
+            $payload['embedding'] = $embedding;
+        }
+
         $response = Http::withHeaders([
             'X-TYPESENSE-API-KEY' => $this->apiKey,
-        ])->post($url, $document);
+        ])->post($url, $payload);
 
         if (! $response->successful()) {
             throw new \RuntimeException(
@@ -47,7 +53,7 @@ class TypesenseVectorStore implements VectorStoreContract
 
         $response = Http::withHeaders([
             'X-TYPESENSE-API-KEY' => $this->apiKey,
-        ])->get($url, array_merge($query, ['per_page' => $limit]));
+        ])->get($url, array_merge($this->normalizeVectorQuery($query), ['per_page' => $limit]));
 
         if (! $response->successful()) {
             Log::error('TypesenseVectorStore: search failed.', [
@@ -139,5 +145,68 @@ class TypesenseVectorStore implements VectorStoreContract
         Http::withHeaders([
             'X-TYPESENSE-API-KEY' => $this->apiKey,
         ])->post("{$this->host}/collections", $schema);
+    }
+
+    /**
+     * Fetch the existing schema of a collection, or null when it does not exist.
+     *
+     * Used to detect vector-dimension conflicts before indexing client-side
+     * embeddings. This is a concrete driver capability; the contract is
+     * intentionally left unchanged.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function collectionSchema(string $collection): ?array
+    {
+        $response = Http::withHeaders([
+            'X-TYPESENSE-API-KEY' => $this->apiKey,
+        ])->get("{$this->host}/collections/{$collection}");
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $schema = $response->json();
+
+        return is_array($schema) ? $schema : null;
+    }
+
+    /**
+     * Translate a raw query vector (passed as an array under `vector_query`)
+     * into Typesense's `vector_query` syntax.
+     *
+     * String `vector_query` values (managed embeddings) pass through unchanged.
+     * An optional `vector_alpha` key carries the hybrid alpha weight.
+     *
+     * @param  array<string, mixed>  $query
+     * @return array<string, mixed>
+     */
+    private function normalizeVectorQuery(array $query): array
+    {
+        $vector = $query['vector_query'] ?? null;
+
+        if (! is_array($vector)) {
+            return $query;
+        }
+
+        $alpha = $query['vector_alpha'] ?? null;
+        unset($query['vector_alpha']);
+
+        $values = implode(',', array_map(
+            fn (float $value): string => rtrim(rtrim(number_format($value, 8, '.', ''), '0'), '.'),
+            $vector
+        ));
+
+        $parts = ['embedding:(['.$values.']'];
+
+        if ($alpha !== null) {
+            $parts[] = 'alpha: '.number_format((float) $alpha, 1);
+        }
+
+        $parts[] = 'k: 25';
+
+        $query['vector_query'] = implode(', ', $parts).')';
+
+        return $query;
     }
 }

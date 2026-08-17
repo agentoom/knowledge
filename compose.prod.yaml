@@ -13,6 +13,8 @@ services:
       - APP_ENV=production
       - APP_DEBUG=false
       - SEED_DEMO=${SEED_DEMO:-true}
+      - TIKA_ENDPOINT=${TIKA_ENDPOINT:-http://tika:9998}
+      - OCR_ENDPOINT=${OCR_ENDPOINT:-http://ocr:8000}
     depends_on:
       pgsql:
         condition: service_healthy
@@ -21,6 +23,8 @@ services:
       typesense:
         condition: service_healthy
       tika:
+        condition: service_healthy
+      ocr:
         condition: service_healthy
     networks:
       - agentoom
@@ -83,6 +87,8 @@ services:
     command: php artisan horizon
     environment:
       - APP_ENV=production
+      - TIKA_ENDPOINT=${TIKA_ENDPOINT:-http://tika:9998}
+      - OCR_ENDPOINT=${OCR_ENDPOINT:-http://ocr:8000}
     depends_on:
       - pgsql
       - redis
@@ -125,6 +131,8 @@ services:
     command: php artisan queue:work redis --queue=default --sleep=3 --tries=3
     environment:
       - APP_ENV=production
+      - TIKA_ENDPOINT=${TIKA_ENDPOINT:-http://tika:9998}
+      - OCR_ENDPOINT=${OCR_ENDPOINT:-http://ocr:8000}
     depends_on:
       - pgsql
       - redis
@@ -155,6 +163,18 @@ services:
       - agentoom
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9998/tika"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Local OCR fallback for images (PaddleOCR)
+  ocr:
+    build:
+      context: ./docker/ocr
+    networks:
+      - agentoom
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3

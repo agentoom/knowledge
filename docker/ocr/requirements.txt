@@ -1,0 +1,4 @@
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+paddlepaddle==2.6.2
+paddleocr==2.9.1

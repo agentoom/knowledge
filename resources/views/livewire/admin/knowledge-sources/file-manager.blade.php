@@ -321,6 +321,16 @@
                                                 <flux:icon name="eye" class="size-4" />
                                             </a>
                                         @endif
+                                        @if (($file['document_status'] ?? null) === 'error' && $this->sourceType !== 'web')
+                                            <button
+                                                wire:click="reprocess({{ $file['document_id'] }})"
+                                                wire:confirm="Queue '{{ $file['filename'] }}' for reprocessing?"
+                                                class="inline-flex items-center justify-center size-8 rounded-md text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                title="Reprocess document"
+                                            >
+                                                <flux:icon name="arrow-path" class="size-4" />
+                                            </button>
+                                        @endif
                                         <button
                                             wire:click="deleteFile('{{ $file['path'] }}')"
                                             wire:confirm="Delete '{{ $file['filename'] }}'? This cannot be undone."

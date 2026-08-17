@@ -35,4 +35,52 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Embedding Providers
+    |--------------------------------------------------------------------------
+    |
+    | Credentials and connection defaults for external embedding providers.
+    | API secrets are read from the environment only — they are never stored
+    | in the settings table. Non-secret connection values (model, endpoint,
+    | dimensions) default here and may be overridden from the Embedding
+    | settings tab.
+    |
+    */
+
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+        'embedding_model' => env('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small'),
+        'embedding_dimensions' => (int) (env('OPENAI_EMBEDDING_DIMENSIONS') ?: 1536),
+    ],
+
+    'cohere' => [
+        'api_key' => env('COHERE_API_KEY'),
+        'base_url' => env('COHERE_BASE_URL', 'https://api.cohere.com/v1'),
+        'embedding_model' => env('COHERE_EMBEDDING_MODEL', 'embed-english-v3.0'),
+        'embedding_dimensions' => (int) (env('COHERE_EMBEDDING_DIMENSIONS') ?: 1024),
+    ],
+
+    'huggingface' => [
+        'endpoint' => env('HUGGINGFACE_EMBEDDING_ENDPOINT', 'http://tei:8080/embed'),
+        'model' => env('HUGGINGFACE_EMBEDDING_MODEL', 'sentence-transformers/all-MiniLM-L6-v2'),
+        'embedding_dimensions' => (int) (env('HUGGINGFACE_EMBEDDING_DIMENSIONS') ?: 384),
+        'api_token' => env('HUGGINGFACE_API_TOKEN'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Document Parsing Services
+    |--------------------------------------------------------------------------
+    */
+
+    'tika' => [
+        'endpoint' => env('TIKA_ENDPOINT', 'http://tika:9998'),
+    ],
+
+    'ocr' => [
+        'endpoint' => env('OCR_ENDPOINT', 'http://ocr:8000'),
+    ],
+
 ];

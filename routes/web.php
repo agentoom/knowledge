@@ -3,6 +3,7 @@
 use App\Actions\ResolveAdminCredentials;
 use App\Enums\Role;
 use App\Http\Controllers\HealthController;
+use App\Livewire\Admin\ActivityLogs\Index as ActivityLogsIndex;
 use App\Livewire\Admin\Chunks\Index as ChunksIndex;
 use App\Livewire\Admin\Dashboard\Index as DashboardIndex;
 use App\Livewire\Admin\Documents\Index as DocumentsIndex;
@@ -79,6 +80,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::livewire('chunks', ChunksIndex::class)->name('chunks.index');
 
         Route::livewire('retrieval-logs', RetrievalLogsIndex::class)->name('retrieval-logs.index');
+
+        Route::livewire('activity-log', ActivityLogsIndex::class)->name('activity-log');
 
         Route::livewire('playground', SearchPlayground::class)->name('playground');
 

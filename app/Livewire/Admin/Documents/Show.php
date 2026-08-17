@@ -2,15 +2,20 @@
 
 namespace App\Livewire\Admin\Documents;
 
+use App\DocumentPipeline\Services\PipelineOrchestrator;
 use App\Knowledge\Models\Document;
 use Illuminate\View\View;
 use Livewire\Component;
 
 class Show extends Component
 {
+    public int $documentId;
+
     public ?string $filename = null;
 
     public ?string $status = null;
+
+    public ?string $sourceType = null;
 
     public ?int $sizeBytes = null;
 
@@ -39,10 +44,28 @@ class Show extends Component
 
     public function mount(int $document): void
     {
-        $document = Document::with(['knowledgeSource', 'chunks'])->findOrFail($document);
+        $this->documentId = $document;
+        $this->loadDocument();
+    }
+
+    public function reprocess(): void
+    {
+        $document = Document::with('knowledgeSource')->findOrFail($this->documentId);
+
+        app(PipelineOrchestrator::class)->reprocess($document);
+
+        session()->flash('status', 'Document reprocessing queued.');
+
+        $this->loadDocument();
+    }
+
+    private function loadDocument(): void
+    {
+        $document = Document::with(['knowledgeSource', 'chunks'])->findOrFail($this->documentId);
 
         $this->filename = $document->filename;
         $this->status = $document->status;
+        $this->sourceType = $document->knowledgeSource?->provider_type;
         $this->sizeBytes = $document->size_bytes;
         $this->mimeType = $document->mime_type;
         $this->path = $document->path;

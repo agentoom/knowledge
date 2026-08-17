@@ -19,6 +19,7 @@ class ApiKey extends Model
         'user_id',
         'name',
         'key',
+        'key_prefix',
         'scopes',
         'knowledge_namespaces',
         'last_used_at',

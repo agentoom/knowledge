@@ -123,6 +123,29 @@
                             Caps how many synonym variants are OR'd into a single query token (2–100, default 10). Prevents over-expansion from large synonym groups causing query bloat.
                         </flux:description>
                     </flux:field>
+
+                    <flux:separator />
+
+                    <flux:field>
+                        <div class="flex items-center gap-3">
+                            <flux:switch wire:model.live="synonymWeightingEnabled" />
+                            <flux:label>Weight Original Query Matches</flux:label>
+                        </div>
+                        <flux:description>
+                            When enabled, results matching the original query terms outrank synonym-only matches. The semantic provider runs a second search for the expanded query and applies the penalty below to items that only matched synonyms.
+                        </flux:description>
+                    </flux:field>
+
+                    @if ($synonymWeightingEnabled)
+                        <flux:field>
+                            <flux:label>Synonym-Only Penalty Factor</flux:label>
+                            <flux:input type="number" wire:model="synonymPenaltyFactor" min="0" max="1" step="0.05" />
+                            <flux:error name="synonymPenaltyFactor" />
+                            <flux:description>
+                                Multiplier applied to synonym-only matches (0.0–1.0, default 0.5). Original-query matches are never penalized.
+                            </flux:description>
+                        </flux:field>
+                    @endif
                 @endif
             </div>
         </flux:card>
@@ -155,6 +178,28 @@
                         <flux:input type="number" wire:model="chunkOverlap" min="0" max="1000" />
                         <flux:error name="chunkOverlap" />
                         <flux:description>Overlapping characters between adjacent chunks (0–1000).</flux:description>
+                    </flux:field>
+                </div>
+
+                <flux:separator />
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <flux:field>
+                        <flux:label>Max Tokens per Chunk</flux:label>
+                        <flux:input type="number" wire:model="chunkMaxTokens" min="1" max="512" />
+                        <flux:error name="chunkMaxTokens" />
+                        <flux:description>
+                            Hard token ceiling for every persisted chunk (1–512, default 384). Chunks above the ceiling are split at token boundaries regardless of the strategy above. The default stays below the installed managed embedding model's 512-token window.
+                        </flux:description>
+                    </flux:field>
+
+                    <flux:field>
+                        <flux:label>Chunk Token Overlap</flux:label>
+                        <flux:input type="number" wire:model="chunkOverlapTokens" min="0" />
+                        <flux:error name="chunkOverlapTokens" />
+                        <flux:description>
+                            Tokens shared between adjacent splits of an oversized chunk (0–max-1, default 64). Must be smaller than the max token ceiling.
+                        </flux:description>
                     </flux:field>
                 </div>
             </div>

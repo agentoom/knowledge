@@ -19,8 +19,13 @@ class PipelineRun extends Command
 
         if ($source = $this->argument('source')) {
             $query->where(function ($q) use ($source) {
-                $q->where('id', $source)
-                    ->orWhere('namespace', $source)
+                // Only compare against the id column for numeric arguments;
+                // PostgreSQL rejects bigint = text comparisons otherwise.
+                if (is_numeric($source)) {
+                    $q->where('id', (int) $source);
+                }
+
+                $q->orWhere('namespace', $source)
                     ->orWhere('slug', $source);
             });
 

@@ -5,6 +5,7 @@ use App\Knowledge\Enums\ProviderType;
 use App\Knowledge\Models\Document;
 use App\Knowledge\Models\KnowledgeSource;
 use App\Livewire\Admin\KnowledgeSources\Create;
+use App\Livewire\Admin\KnowledgeSources\FileManager;
 use App\Livewire\Admin\KnowledgeSources\Index;
 use App\Livewire\Admin\KnowledgeSources\Show;
 use App\Models\User;
@@ -160,7 +161,7 @@ test('can create knowledge source with filesystem type (multi-format)', function
         ->and($source->provider_type)->toBe('filesystem');
 });
 
-// --- Edit (still on Index component) ---
+// --- Edit (via the Show component's structured form) ---
 
 test('can edit knowledge source and update sql config', function () {
     $source = KnowledgeSource::create([
@@ -175,18 +176,19 @@ test('can edit knowledge source and update sql config', function () {
     ]);
 
     Livewire::actingAs($this->admin)
-        ->test(Index::class)
-        ->call('edit', $source->id)
-        ->assertSet('editName', 'Old SQL Source')
-        ->assertSet('editConfigConnectionName', 'pgsql')
-        ->assertSet('editConfigTable', 'users')
-        ->set('editName', 'Updated SQL Source')
-        ->set('editConfigTable', 'customers')
-        ->call('update')
-        ->assertHasNoErrors();
+        ->test(Show::class, ['source' => $source->id])
+        ->assertSet('name', 'Old SQL Source')
+        ->assertSet('configConnectionName', 'pgsql')
+        ->assertSet('configTable', 'users')
+        ->set('name', 'Updated SQL Source')
+        ->set('configTable', 'customers')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertSet('isEditing', false);
 
     $source->refresh();
     expect($source->name)->toBe('Updated SQL Source')
+        ->and($source->slug)->toBe('updated-sql-source')
         ->and($source->provider_config['connection'])->toBe('pgsql')
         ->and($source->provider_config['table'])->toBe('customers');
 });
@@ -204,16 +206,15 @@ test('can edit knowledge source and change from named to dynamic sql connection'
     ]);
 
     Livewire::actingAs($this->admin)
-        ->test(Index::class)
-        ->call('edit', $source->id)
-        ->assertSet('editConfigUseDynamicConnection', false)
-        ->assertSet('editConfigConnectionName', 'pgsql')
-        ->set('editConfigUseDynamicConnection', true)
-        ->set('editConfigDriver', 'mysql')
-        ->set('editConfigHost', 'new-db.example.com')
-        ->set('editConfigDatabase', 'new_db')
-        ->set('editConfigTable', 'new_table')
-        ->call('update')
+        ->test(Show::class, ['source' => $source->id])
+        ->assertSet('configUseDynamicConnection', false)
+        ->assertSet('configConnectionName', 'pgsql')
+        ->set('configUseDynamicConnection', true)
+        ->set('configDriver', 'mysql')
+        ->set('configHost', 'new-db.example.com')
+        ->set('configDatabase', 'new_db')
+        ->set('configTable', 'new_table')
+        ->call('save')
         ->assertHasNoErrors();
 
     $source->refresh();
@@ -414,10 +415,14 @@ test('can remove file from filesystem source', function () {
     expect(file_exists($document->path))->toBeTrue();
 
     Livewire::actingAs($this->admin)
-        ->test(Index::class)
-        ->call('edit', $source->id)
-        ->call('removeFile', $document->id)
-        ->assertHasNoErrors();
+        ->test(FileManager::class, [
+            'sourceId' => $source->id,
+            'sourceType' => 'filesystem',
+            'sourceNamespace' => 'uploads',
+        ])
+        ->call('deleteFile', $filePath)
+        ->assertHasNoErrors()
+        ->assertSet('statusMessage', 'File deleted.');
 
     expect(Document::find($document->id))->toBeNull();
     expect(file_exists($filePath))->toBeFalse();

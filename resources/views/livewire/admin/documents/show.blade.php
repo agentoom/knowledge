@@ -69,9 +69,26 @@
         </flux:card>
     </div>
 
+    {{-- Reprocess flash --}}
+    @if (session('status'))
+        <flux:callout color="blue" icon="information-circle" class="mt-6">{{ session('status') }}</flux:callout>
+    @endif
+
     {{-- Error Message --}}
     @if ($errorMessage)
-        <flux:callout color="red" class="mt-6">{{ $errorMessage }}</flux:callout>
+        <div class="mt-6 flex items-start justify-between gap-4">
+            <flux:callout color="red" class="flex-1">{{ $errorMessage }}</flux:callout>
+            @if ($status === 'error' && $sourceType !== 'web')
+                <flux:button
+                    variant="outline"
+                    icon="arrow-path"
+                    wire:click="reprocess"
+                    wire:confirm="Queue this document for reprocessing?"
+                >
+                    Reprocess
+                </flux:button>
+            @endif
+        </div>
     @endif
 
     {{-- Content --}}

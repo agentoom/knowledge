@@ -174,6 +174,13 @@ Agentoom Knowledge provides deep visibility into its "black box" retrieval logic
 *   **Health Endpoint:** A `GET /health` JSON endpoint reports the status of database, Redis, Typesense, and storage. Designed for Docker healthchecks, Kubernetes probes, and load-balancer monitoring — returns 200 when all services are healthy, 503 if any critical service is down.
 *   **Notification Pipeline:** Configurable email and webhook alerts for operational events — high search latency, consecutive sync failures, and federation errors. Thresholds, alert types, and cooldown windows are managed from the Admin UI under **Settings → Notifications**.
 
+### Enterprise Administration
+Phase 9 adds the operational controls enterprises need to audit and maintain a knowledge deployment:
+
+- **Activity / Audit Trail:** Every knowledge source, API key, and settings mutation is recorded in an append-only `activity_log` with the actor, action, subject, IP address, and a property diff. Sensitive values — passwords, tokens, API keys, and hashes — are redacted before storage, so encrypted SQL credentials and key hashes never reach the audit trail. Browse and filter it under **Admin → Activity Log** (admin/operator only); settings deletion is audited too, and the Danger Zone reset truncates the same table.
+- **Document Reprocessing:** `ParseDocument` retries transient Tika/OCR failures (3 attempts with 30s/120s backoff) before leaving a document in `error`. `PipelineOrchestrator::reprocess()` resets an errored, non-web document to `discovered`, de-indexes and clears its stale chunks, and re-queues parsing — reachable from the document detail page, the file manager, or the `knowledge:documents:reprocess` artisan command (`--source=` and `--limit=`). Web documents are re-fetched through their source pipeline, never reparsed from URL paths.
+- **Knowledge Source Templates:** The create wizard ships versioned presets (`markdown_docs`, `filesystem_documents`, `web_docs`, `sql_table`) that prefill name, namespace, and provider config. Templates never contain credentials, and a slug-collision check surfaces a field error instead of a database unique-key exception.
+
 ### Federation
 Agentoom Knowledge servers can be federated so that a single instance queries multiple servers transparently:
 *   **FederatedServer Model:** Each remote server is registered with an endpoint URL, encrypted API token, and priority.
@@ -190,6 +197,8 @@ The document pipeline uses content-type-aware chunking to preserve semantic mean
 *   **FixedSizeChunking:** Character-based with word-boundary respect — the safe fallback.
 
 The `ChunkingStrategyRegistry` automatically selects the best strategy based on MIME type and file extension.
+
+**Token-aware enforcement:** Every chunk produced by any strategy passes through the `TokenAwareChunker`, which caps chunks at the configured `knowledge.chunk_max_tokens` ceiling (default 384, safely inside the installed managed embedding model's 512-token window) and splits oversized chunks at token boundaries with `knowledge.chunk_overlap_tokens` overlap (default 64). The `TokenCounter` uses a deterministic UTF-8 tokenizer so the persisted `token_count`, the indexing metadata, and the document detail view all report the same value. Both settings are managed under **Settings → Search Config**; on re-chunking, prior chunk vectors are de-indexed first so retries or config changes never leave orphaned vectors behind.
 
 ### Search Quality
 
@@ -220,6 +229,14 @@ Query-time synonym expansion rewrites search terms using administrator-defined s
 - **Expansion Cap:** A configurable `knowledge.synonym_expansion_max_terms` setting (default 10, range 2–100) caps how many synonym variants are appended per token. Prevents over-expansion from large synonym groups causing query bloat and precision loss.
 - **Ranking behavior:** Typesense's TF-IDF scoring treats synonym terms with equal weight to original query terms — a document matching 4 synonym terms may outrank one matching 2 original terms. The expansion cap is the primary defense: keep it low (default 10) for precision-biased deployments, raise it for recall-heavy ones.
 - **Multi-word phrases:** Multi-word synonyms are wrapped in double quotes to preserve phrase matching (e.g., `"continuous delivery"`).
+
+#### Synonym Weighting
+When synonym groups grow large, expanded terms can drown out original-query matches in ranking. Phase 9 adds an optional two-pass weighting pass in the `SemanticProvider`:
+
+- **Original-query first:** When enabled, the provider runs a second search over the expanded query. Items matching the original terms keep their position, while synonym-only items are appended with their score multiplied by `knowledge.synonym_penalty_factor` (default 0.5).
+- **Bounded recall:** Both passes pull from a recall pool capped at 250 (`min(250, max(maxResults × 2, 50))`), then truncate to `maxResults` before the indexed-document filter.
+- **Toggleable:** Controlled by `knowledge.synonym_weighting_enabled` in **Settings → Search Config**. Disabled (default) preserves the legacy single-pass ranking exactly.
+- **Local-provider only:** Weighting applies to the local `SemanticProvider`; federated results are unchanged since their protocol carries no original-term provenance.
 
 #### Recency-Aware Reciprocal Rank Fusion
 The RRF fusion strategy was extended with an optional recency boost that gives fresher content a scoring advantage:
@@ -304,6 +321,11 @@ The `WebProvider` fetches and converts content from configured URLs into searcha
 - **Content Deduplication:** SHA-256 hashing at upload, parse, and sync stages prevents duplicate content from entering the index — duplicates are flagged and their chunks de-indexed.
 - **Synonym Expansion:** Configurable synonym groups expand queries at search time (e.g., "car" → "car OR automobile OR vehicle") with a per-token expansion cap to prevent query bloat — toggleable per deployment with no reindexing.
 - **Recency-aware Ranking:** Exponential-decay recency boost in RRF fusion — fresh content surfaces higher (configurable boost factor and half-life).
+- **Activity / Audit Trail:** Append-only audit log of knowledge source, API key, and setting changes with actor, action, subject, IP, and redacted properties — browsable under **Admin → Activity Log**.
+- **Token-Aware Chunking:** A deterministic UTF-8 tokenizer caps every persisted chunk within the configured LLM context window (default 384 tokens), regardless of the active chunking strategy.
+- **Document Reprocessing:** `ParseDocument` retries transient Tika/OCR failures automatically (3 attempts), and errored documents can be re-queued from the UI or the `knowledge:documents:reprocess` command.
+- **Knowledge Source Templates:** One-click presets (Markdown docs, filesystem, web, SQL table) prefill the create wizard without shipping credentials.
+- **Synonym Weighting:** Two-pass search scores original-query matches above synonym-only matches (configurable penalty) to protect precision as synonym groups grow.
 - **Apache Tika Integration:** Robust parsing for hundreds of document formats (PDF, DOCX, etc.).
 - **Passkeys + 2FA:** Fortify-powered authentication with passkeys and TOTP two-factor auth.
 - **Role-based Access:** Admin, Operator, and Viewer roles for UI authorization.
@@ -426,8 +448,8 @@ vendor/bin/sail artisan horizon
 - **Phase 5:** True web crawling (domain recursive), MCP federation. ✅
 - **Phase 6:** Production hardening — Laravel scheduler for periodic maintenance (Horizon snapshots, federation sync, log pruning), rate limiting on the MCP API endpoint, health-check endpoint for Docker and load balancers, notification pipeline for sync failures and high-latency alerts. ✅
 - **Phase 7:** Search quality — hybrid keyword+vector search in Typesense, content deduplication via SHA-256 hashing in the parse stage, configurable synonym expansion for query rewriting, recency-aware scoring in Reciprocal Rank Fusion so fresher content surfaces higher. ✅
-- **Phase 8:** Provider completeness — external embedding provider implementation (OpenAI, Cohere, local HuggingFace) through the existing `EmbeddingProvider` contract, MCP resources for document and source browsing, **OCR fallback for images**: a local OCR engine (e.g., PaddleOCR) running in the same Docker stack that the pipeline calls only when Tika returns empty or near-empty content from image files (jpg, png, tiff, etc.), so image-based documents become searchable without external API dependencies. Non-image parsing stays on Tika; OCR is a targeted gap-filler, not a replacement.
-- **Phase 9:** Enterprise features — activity/audit trail tracking who changed what (sources, API keys, settings), token-aware chunking that respects LLM context windows, retry/reprocess mechanism for documents stuck in `error` status after transient Tika failures, knowledge source templates for one-click setup of common configurations, **synonym weighting** — score documents matching original query terms higher than those matching only expanded synonyms (two-pass search or post-retrieval score penalty) to prevent recall from drowning precision when synonym groups grow large.
+- **Phase 8:** Provider completeness — external embedding provider implementation (OpenAI, Cohere, local HuggingFace) through the existing `EmbeddingProvider` contract, MCP resources for document and source browsing, **OCR fallback for images**: a local OCR engine (e.g., PaddleOCR) running in the same Docker stack that the pipeline calls only when Tika returns empty or near-empty content from image files (jpg, png, tiff, etc.), so image-based documents become searchable without external API dependencies. Non-image parsing stays on Tika; OCR is a targeted gap-filler, not a replacement. ✅
+- **Phase 9:** Enterprise features — activity/audit trail tracking who changed what (sources, API keys, settings), token-aware chunking that respects LLM context windows, retry/reprocess mechanism for documents stuck in `error` status after transient Tika failures, knowledge source templates for one-click setup of common configurations, **synonym weighting** — score documents matching original query terms higher than those matching only expanded synonyms (two-pass search or post-retrieval score penalty) to prevent recall from drowning precision when synonym groups grow large. ✅
 - **Phase 10:** Test coverage — dedicated tests for each provider (Yaml, Json, Markdown, Web, Sql), chunking strategy tests for all four strategies, Livewire component tests for Playground, ApiKeys, DangerZone, and Dashboard.
 - **Phase 11:** Future horizons — knowledge graph traversal, semantic caching of retrieval results, multi-tenancy with row-level data isolation (schema already has `tenant_id` columns), fine-tuned embedding models for domain-specific knowledge, and additional OCR/parser improvements.
 

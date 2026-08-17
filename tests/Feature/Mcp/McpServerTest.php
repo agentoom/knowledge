@@ -1,5 +1,9 @@
 <?php
 
+use App\Mcp\Resources\DocumentResource;
+use App\Mcp\Resources\ListDocumentsResource;
+use App\Mcp\Resources\ListSourcesResource;
+use App\Mcp\Resources\SourceResource;
 use App\Mcp\Servers\KnowledgeServer;
 use App\Mcp\Tools\GetSourceSchema;
 use App\Mcp\Tools\ListSources;
@@ -10,6 +14,18 @@ test('knowledge server metadata', function () {
     $attributes = $reflection->getAttributes();
 
     expect($attributes)->toHaveCount(3);
+});
+
+test('browsing resources are registered on the server', function () {
+    $reflection = new ReflectionClass(KnowledgeServer::class);
+
+    expect($reflection->getDefaultProperties()['resources'])
+        ->toBe([
+            ListSourcesResource::class,
+            SourceResource::class,
+            ListDocumentsResource::class,
+            DocumentResource::class,
+        ]);
 });
 
 test('search knowledge tool is registered', function () {
@@ -87,6 +103,28 @@ test('get source schema tool returns error when source id is missing', function 
 test('get source schema tool returns error for unknown source', function () {
     $response = KnowledgeServer::tool(GetSourceSchema::class, [
         'source_id' => 'nonexistent',
+    ]);
+
+    $response->assertHasErrors();
+});
+
+test('list sources resource is readable', function () {
+    $response = KnowledgeServer::resource(ListSourcesResource::class);
+
+    $response->assertOk();
+});
+
+test('source resource errors on unknown source', function () {
+    $response = KnowledgeServer::resource(SourceResource::class, [
+        'source' => 'nonexistent',
+    ]);
+
+    $response->assertHasErrors();
+});
+
+test('document resource errors on non-numeric id', function () {
+    $response = KnowledgeServer::resource(DocumentResource::class, [
+        'id' => 'not-a-number',
     ]);
 
     $response->assertHasErrors();

@@ -8,6 +8,7 @@ use App\Knowledge\Models\Document;
 use App\Knowledge\Models\KnowledgeSource;
 use App\Knowledge\Models\Provider;
 use App\Models\ApiKey;
+use App\Models\Setting;
 use App\VectorStore\Models\VectorStore;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -189,6 +190,50 @@ class KnowledgeDemoSeeder extends Seeder
                 ],
                 'is_active' => true,
             ]
+        );
+
+        // Seed the embedding provider settings so SettingsManager can cache
+        // them (missing keys are re-queried from the DB on every read, which
+        // would add a query per chunk in the indexing hot path). Empty
+        // non-secret values fall through to environment defaults at runtime.
+        Setting::firstOrCreate(
+            ['key' => 'knowledge.embedding_provider'],
+            ['value' => 'typesense', 'type' => 'string']
+        );
+
+        Setting::firstOrCreate(
+            ['key' => 'knowledge.embedding_model'],
+            ['value' => '', 'type' => 'string']
+        );
+
+        Setting::firstOrCreate(
+            ['key' => 'knowledge.embedding_endpoint'],
+            ['value' => '', 'type' => 'string']
+        );
+
+        Setting::firstOrCreate(
+            ['key' => 'knowledge.embedding_dimensions'],
+            ['value' => '0', 'type' => 'integer']
+        );
+
+        Setting::firstOrCreate(
+            ['key' => 'knowledge.chunk_max_tokens'],
+            ['value' => '384', 'type' => 'integer']
+        );
+
+        Setting::firstOrCreate(
+            ['key' => 'knowledge.chunk_overlap_tokens'],
+            ['value' => '64', 'type' => 'integer']
+        );
+
+        Setting::firstOrCreate(
+            ['key' => 'knowledge.synonym_weighting_enabled'],
+            ['value' => '0', 'type' => 'boolean']
+        );
+
+        Setting::firstOrCreate(
+            ['key' => 'knowledge.synonym_penalty_factor'],
+            ['value' => '0.5', 'type' => 'float']
         );
 
         $this->command->info('Demo data seeded successfully!');

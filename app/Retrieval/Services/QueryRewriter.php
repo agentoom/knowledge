@@ -2,6 +2,7 @@
 
 namespace App\Retrieval\Services;
 
+use App\Retrieval\Models\RewrittenQuery;
 use App\Settings\Facades\Settings;
 
 /**
@@ -29,14 +30,25 @@ class QueryRewriter
      */
     public function rewrite(string $query): string
     {
+        return $this->expand($query)->rewritten;
+    }
+
+    /**
+     * Expand a raw query and decompose it into original and expansion terms.
+     *
+     * Expansion disabled or no matches: original === rewritten and the
+     * expansion list stays empty, preserving the legacy single-pass path.
+     */
+    public function expand(string $query): RewrittenQuery
+    {
         if (! $this->isEnabled()) {
-            return $query;
+            return new RewrittenQuery($query, $query);
         }
 
         $expansionMap = $this->synonymService->buildExpansionMap();
 
         if ($expansionMap === []) {
-            return $query;
+            return new RewrittenQuery($query, $query);
         }
 
         $maxTerms = (int) Settings::get('knowledge.synonym_expansion_max_terms', 10);
@@ -81,7 +93,7 @@ class QueryRewriter
         }
 
         if ($expansionTerms === []) {
-            return $query;
+            return new RewrittenQuery($query, $query, $originalTerms);
         }
 
         // Append unique expansion terms. The expanded query looks like:
@@ -91,9 +103,14 @@ class QueryRewriter
         // weight to original terms. The expansion cap (max_terms) is the primary
         // defense against synonym-rich documents dominating ranking — keep it low
         // (default 10) for precision, increase for recall-heavy deployments.
-        $unique = array_unique($expansionTerms);
+        $unique = array_values(array_unique($expansionTerms));
 
-        return $query.' '.implode(' ', $unique);
+        return new RewrittenQuery(
+            original: $query,
+            rewritten: $query.' '.implode(' ', $unique),
+            originalTerms: $originalTerms,
+            expansionTerms: $unique,
+        );
     }
 
     /**

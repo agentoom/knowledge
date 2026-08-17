@@ -3,9 +3,11 @@
 namespace App\DocumentPipeline\Services;
 
 use App\Jobs\DocumentPipeline\CrawlWebSource;
+use App\Jobs\DocumentPipeline\DeindexDocument;
 use App\Jobs\DocumentPipeline\DiscoverDocuments;
 use App\Jobs\DocumentPipeline\NormalizeDocument;
 use App\Jobs\DocumentPipeline\ParseDocument;
+use App\Knowledge\Enums\DocumentStatus;
 use App\Knowledge\Models\Document;
 use App\Knowledge\Models\KnowledgeSource;
 use App\Providers\Web\CrawlConfig;
@@ -71,11 +73,51 @@ class PipelineOrchestrator
             ->dispatch();
     }
 
-    public function reindex(Document $document): void
+    /**
+     * Reset an errored document and queue it for a fresh parse.
+     *
+     * Only documents in the error state backed by a non-web source are
+     * eligible. Web documents are re-fetched through their source pipeline,
+     * never reparsed from URL paths. A safe no-op otherwise — admin clicks
+     * must not throw.
+     */
+    public function reprocess(Document $document): void
     {
-        Log::info('Reindexing document.', [
+        if ($document->status !== DocumentStatus::Error->value) {
+            Log::warning('Reprocess skipped: document is not in error state.', [
+                'document_id' => $document->id,
+            ]);
+
+            return;
+        }
+
+        if ($document->knowledgeSource?->provider_type === 'web') {
+            Log::warning('Reprocess skipped: web documents are re-fetched through their source pipeline.', [
+                'document_id' => $document->id,
+            ]);
+
+            return;
+        }
+
+        // De-index any previously indexed chunks and drop the local rows so
+        // the retry starts from a clean slate.
+        $chunkIds = $document->chunks()->pluck('id')->toArray();
+
+        if (! empty($chunkIds)) {
+            DeindexDocument::dispatch($chunkIds);
+            $document->chunks()->delete();
+        }
+
+        $document->update([
+            'status' => DocumentStatus::Discovered->value,
+            'error_message' => null,
+            'parsed_at' => null,
+            'chunked_at' => null,
+            'indexed_at' => null,
+        ]);
+
+        Log::info('Document queued for reprocessing.', [
             'document_id' => $document->id,
-            'filename' => $document->filename,
         ]);
 
         ParseDocument::dispatch($document->id);

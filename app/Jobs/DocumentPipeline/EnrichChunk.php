@@ -2,6 +2,7 @@
 
 namespace App\Jobs\DocumentPipeline;
 
+use App\DocumentPipeline\Services\TokenCounter;
 use App\Knowledge\Models\Chunk;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -32,7 +33,10 @@ class EnrichChunk implements ShouldQueue
             ?? $document->filename;
 
         $chunkMetadata['chunk_size_bytes'] = strlen($chunk->content ?? '');
-        $chunkMetadata['token_count'] = str_word_count($chunk->content ?? '');
+
+        // Must agree with the token_count persisted by ChunkDocument: the
+        // document detail view and the indexed metadata share this counter.
+        $chunkMetadata['token_count'] = app(TokenCounter::class)->count($chunk->content ?? '');
 
         $embeddingPayload = json_encode([
             'content' => $chunk->content,

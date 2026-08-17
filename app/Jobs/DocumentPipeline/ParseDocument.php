@@ -14,6 +14,20 @@ class ParseDocument implements ShouldQueue
     use Batchable;
     use Queueable;
 
+    /**
+     * Tika extraction plus the OCR fallback can exceed the default worker
+     * timeout for large image files. Kept to the value the OCR service needs.
+     */
+    public int $timeout = 180;
+
+    /**
+     * Transient Tika/OCR failures are retried by the queue worker before the
+     * document is left in the terminal error state.
+     */
+    public int $tries = 3;
+
+    public array $backoff = [30, 120];
+
     public function __construct(
         public readonly int $documentId,
     ) {}
@@ -83,6 +97,11 @@ class ParseDocument implements ShouldQueue
                 'status' => 'error',
                 'error_message' => $e->getMessage(),
             ]);
+
+            // Persist the terminal error state, then rethrow so the queue
+            // can retry transient Tika/OCR failures (3 attempts with the
+            // configured backoff) before the document stays errored.
+            throw $e;
         }
     }
 }

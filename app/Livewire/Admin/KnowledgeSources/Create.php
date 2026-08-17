@@ -4,8 +4,11 @@ namespace App\Livewire\Admin\KnowledgeSources;
 
 use App\Knowledge\Enums\ProviderType;
 use App\Knowledge\Models\KnowledgeSource;
+use App\Knowledge\Services\KnowledgeSourceTemplateRegistry;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use InvalidArgumentException;
 use Livewire\Component;
 
 /**
@@ -65,6 +68,8 @@ class Create extends Component
 
     public string $configUrls = '';
 
+    public string $selectedTemplate = '';
+
     public function nextStep(): void
     {
         if ($this->step === 1) {
@@ -106,6 +111,89 @@ class Create extends Component
             'providerType' => 'required|string|in:filesystem,sql,yaml,json,markdown,web',
             'description' => 'nullable|string|max:1000',
         ]);
+
+        // Template defaults are reusable, so a slug collision must surface as
+        // a field error instead of a database unique-key exception on create.
+        $slug = str($this->name)->slug()->toString();
+
+        if (KnowledgeSource::where('slug', $slug)->exists()) {
+            throw ValidationException::withMessages([
+                'name' => "A knowledge source with the slug \"{$slug}\" already exists. Choose a different name.",
+            ]);
+        }
+    }
+
+    /**
+     * Load a config template into the wizard fields.
+     *
+     * Stale fields from a previously selected provider type are cleared, and
+     * secrets are left blank for the user to review before creation.
+     */
+    public function applyTemplate(string $key): void
+    {
+        try {
+            $template = app(KnowledgeSourceTemplateRegistry::class)->get($key);
+        } catch (InvalidArgumentException $e) {
+            $this->addError('selectedTemplate', $e->getMessage());
+
+            return;
+        }
+
+        $this->resetProviderConfigFields();
+        $this->resetValidation('selectedTemplate');
+
+        $this->selectedTemplate = $key;
+        $this->name = $template['default_name'];
+        $this->namespace = $template['namespace'];
+        $this->description = $template['description'];
+        $this->providerType = $template['provider_type'];
+
+        $this->applyTemplateConfig($template['provider_config']);
+    }
+
+    /**
+     * Reset every provider-specific field so a previously selected type's
+     * values never leak into a newly applied template.
+     */
+    private function resetProviderConfigFields(): void
+    {
+        $this->configConnectionName = '';
+        $this->configUseDynamicConnection = false;
+        $this->configDriver = 'mysql';
+        $this->configPort = '3306';
+        $this->configHost = '';
+        $this->configDatabase = '';
+        $this->configUsername = '';
+        $this->configPassword = '';
+        $this->configTable = '';
+        $this->configBasePath = '';
+        $this->configUrls = '';
+    }
+
+    /**
+     * Map only the existing SQL/web/filesystem config fields from the preset.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private function applyTemplateConfig(array $config): void
+    {
+        if ($this->providerType === 'web') {
+            $urls = $config['urls'] ?? [];
+
+            $this->configUrls = is_array($urls) ? implode("\n", $urls) : '';
+
+            return;
+        }
+
+        if ($this->providerType === 'sql') {
+            $connection = $config['connection'] ?? '';
+
+            if (is_string($connection)) {
+                $this->configConnectionName = $connection;
+            }
+
+            $this->configTable = (string) ($config['table'] ?? '');
+        }
     }
 
     protected function computeDirectoryPath(): void
@@ -141,8 +229,10 @@ class Create extends Component
             'provider_config' => $config,
         ]);
 
-        // Ensure directory is created for filesystem-backed sources
-        if ($this->directoryPath !== '' && ! $this->directoryExists) {
+        // Ensure directory is created for filesystem-backed sources. The
+        // sync pipeline may already have created it during create(), so the
+        // check is done against the filesystem rather than the stale flag.
+        if ($this->directoryPath !== '' && ! is_dir($this->directoryPath)) {
             mkdir($this->directoryPath, 0755, true);
             $this->directoryExists = true;
         }
@@ -187,7 +277,8 @@ class Create extends Component
 
     public function render(): View
     {
-        return view('livewire.admin.knowledge-sources.create')
-            ->layout('layouts.app', ['header' => 'Create Knowledge Source']);
+        return view('livewire.admin.knowledge-sources.create', [
+            'templates' => app(KnowledgeSourceTemplateRegistry::class)->all(),
+        ])->layout('layouts.app', ['header' => 'Create Knowledge Source']);
     }
 }
