@@ -6,8 +6,6 @@ Agentoom Knowledge is a self-hosted Knowledge Server that exposes trusted enterp
 
 📖 **[Read the full article →](ARTICLE.md)** &nbsp;|&nbsp; 🚀 **[Installation Guide →](docs/INSTALLATION.md)** &nbsp;|&nbsp; 📚 **[How to Use →](docs/HOW_TO_USE.md)** &nbsp;|&nbsp; 🔌 **[Extending →](docs/EXTENDING.md)**
 
----This 
-
 ## The Problem
 
 Enterprise knowledge is inherently heterogeneous. It lives in fragmented systems, each optimized for a specific purpose:
@@ -319,7 +317,7 @@ The `WebProvider` fetches and converts content from configured URLs into searcha
 - **Horizon Queues:** Background indexing and document processing via Redis queues.
 - **Hybrid Search:** Combined keyword+vector search in Typesense with configurable alpha weighting — balances precision and semantic recall in a single query.
 - **Content Deduplication:** SHA-256 hashing at upload, parse, and sync stages prevents duplicate content from entering the index — duplicates are flagged and their chunks de-indexed.
-- **Synonym Expansion:** Configurable synonym groups expand queries at search time (e.g., "car" → "car OR automobile OR vehicle") with a per-token expansion cap to prevent query bloat — toggleable per deployment with no reindexing.
+- **Synonym Expansion:** Configurable synonym groups append equivalent terms to queries at search time (e.g., "car" → "car automobile vehicle") with a per-token expansion cap to prevent query bloat — toggleable per deployment with no reindexing.
 - **Recency-aware Ranking:** Exponential-decay recency boost in RRF fusion — fresh content surfaces higher (configurable boost factor and half-life).
 - **Activity / Audit Trail:** Append-only audit log of knowledge source, API key, and setting changes with actor, action, subject, IP, and redacted properties — browsable under **Admin → Activity Log**.
 - **Token-Aware Chunking:** A deterministic UTF-8 tokenizer caps every persisted chunk within the configured LLM context window (default 384 tokens), regardless of the active chunking strategy.
@@ -327,6 +325,9 @@ The `WebProvider` fetches and converts content from configured URLs into searcha
 - **Knowledge Source Templates:** One-click presets (Markdown docs, filesystem, web, SQL table) prefill the create wizard without shipping credentials.
 - **Synonym Weighting:** Two-pass search scores original-query matches above synonym-only matches (configurable penalty) to protect precision as synonym groups grow.
 - **Apache Tika Integration:** Robust parsing for hundreds of document formats (PDF, DOCX, etc.).
+- **External Embedding Providers:** OpenAI, Cohere, and local HuggingFace implementations through the `EmbeddingProvider` contract.
+- **MCP Resources:** Browse documents and knowledge sources through MCP resources.
+- **OCR Fallback:** Local PaddleOCR processing for image documents when Apache Tika returns empty or near-empty content.
 - **Passkeys + 2FA:** Fortify-powered authentication with passkeys and TOTP two-factor auth.
 - **Role-based Access:** Admin, Operator, and Viewer roles for UI authorization.
 
